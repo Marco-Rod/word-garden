@@ -43,48 +43,50 @@ export class ResultScene extends Phaser.Scene {
     this.buttons = [];
     const { result, totalScore } = this.resultData;
     const isFinal = !levelSystem.next(result.levelId);
+    const compact = this.scale.width < 430;
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2;
-    const panelW = Math.min(this.scale.width - 32, 500);
-    const panelH = Math.min(this.scale.height - 32, isFinal ? 500 : 590);
+    const panelW = Math.min(this.scale.width - 24, 500);
+    const panelH = Math.min(this.scale.height - 20, isFinal ? 410 : 510);
+    const top = cy - panelH / 2;
 
     const panel = this.add.graphics();
     panel.fillStyle(FILLS.panel, 0.97);
-    panel.fillRoundedRect(cx - panelW / 2, cy - panelH / 2, panelW, panelH, 28);
+    panel.fillRoundedRect(cx - panelW / 2, top, panelW, panelH, 28);
     panel.lineStyle(4, FILLS.panelBorder, 1);
-    panel.strokeRoundedRect(cx - panelW / 2, cy - panelH / 2, panelW, panelH, 28);
+    panel.strokeRoundedRect(cx - panelW / 2, top, panelW, panelH, 28);
 
-    this.addText(cx, cy - panelH / 2 + 58, isFinal ? '¡INCREÍBLE! 🎉' : '¡MUY BIEN!', 36, INK.dark, true);
+    this.addText(cx, top + 42, isFinal ? '¡INCREÍBLE! 🎉' : '¡MUY BIEN!', compact ? 31 : 36, INK.dark, true);
     if (isFinal) {
-      this.addText(cx, cy - panelH / 2 + 108, 'Completaste todos\nnuestros niveles 🌱', 24, INK.body);
+      this.addText(cx, top + 84, 'Completaste todos\nnuestros niveles 🌱', compact ? 21 : 24, INK.body);
     } else {
-      this.addText(cx, cy - panelH / 2 + 108, `NIVEL ${result.levelId}`, 25, INK.body, true);
+      this.addText(cx, top + 78, `NIVEL ${result.levelId}`, compact ? 22 : 25, INK.body, true);
     }
 
-    this.addStars(cx, cy - panelH / 2 + (isFinal ? 180 : 165), result.stars);
-    const scoreY = cy - panelH / 2 + (isFinal ? 235 : 225);
-    this.addText(cx, scoreY, `🏆 ${result.score.toLocaleString('es-MX')} puntos`, 28, INK.dark, true);
+    this.addStars(cx, top + (isFinal ? 145 : 128), result.stars, compact);
+    const scoreY = top + (isFinal ? 205 : 185);
+    this.addText(cx, scoreY, `🏆 ${result.score.toLocaleString('es-MX')} puntos`, compact ? 24 : 28, INK.dark, true);
 
     if (!isFinal) {
-      this.addText(cx, scoreY + 54, `Palabras    ${result.foundWords.length}/${levelSystem.get(result.levelId)?.words.length ?? 0}`, 20, INK.body);
-      this.addText(cx, scoreY + 84, `Tiempo       ${Math.round(result.elapsedSeconds)}s`, 20, INK.body);
-      this.addText(cx, scoreY + 114, `Errores      ${result.errors}`, 20, INK.body);
+      this.addStat(cx, panelW, scoreY + 48, 'Palabras', `${result.foundWords.length}/${levelSystem.get(result.levelId)?.words.length ?? 0}`, compact);
+      this.addStat(cx, panelW, scoreY + 78, 'Tiempo', `${Math.round(result.elapsedSeconds)} s`, compact);
+      this.addStat(cx, panelW, scoreY + 108, 'Errores', `${result.errors}`, compact);
     }
-    // Las acciones se anclan después de los datos de la partida. Así los dos
-    // botones conservan aire entre sí y no rozan el borde en pantallas bajas.
-    const totalY = scoreY + (isFinal ? 90 : 165);
-    this.addText(cx, totalY, `Total de esta partida  ${totalScore.toLocaleString('es-MX')} puntos`, 20, INK.dark, true);
+    const totalY = scoreY + (isFinal ? 62 : 150);
+    this.addText(cx, totalY, `TOTAL DE LA PARTIDA\n${totalScore.toLocaleString('es-MX')} PTS`, compact ? 16 : 18, INK.dark, true);
     if (!isFinal) {
-      this.addButton(cx, totalY + 68, 'SIGUIENTE NIVEL ▶', () => {
+      this.addButton(cx, totalY + 58, 'SIGUIENTE NIVEL ▶', () => {
         this.scene.start('Game', { levelId: levelSystem.next(result.levelId)!.id });
-      });
+      }, false, panelW, compact);
     }
-    this.addButton(cx, totalY + (isFinal ? 164 : 148), 'MAPA', () => this.scene.start('LevelMap'), true);
+    this.addButton(cx, totalY + (isFinal ? 110 : 128), 'MAPA', () => this.scene.start('LevelMap'), true, panelW, compact);
   }
 
-  private addStars(x: number, y: number, earned: number): void {
+  private addStars(x: number, y: number, earned: number, compact: boolean): void {
+    const spacing = compact ? 50 : 58;
+    const size = compact ? 37 : 42;
     for (let index = 0; index < 3; index++) {
-      const star = this.addText(x + (index - 1) * 58, y, index < earned ? '⭐' : '☆', 42, '#f9a825', true);
+      const star = this.addText(x + (index - 1) * spacing, y, index < earned ? '⭐' : '☆', size, '#f9a825', true);
       star.setScale(0);
       this.tweens.add({ targets: star, scale: 1, duration: 250, delay: index * 250, ease: 'Back.Out' });
     }
@@ -101,14 +103,21 @@ export class ResultScene extends Phaser.Scene {
     }).setOrigin(0.5);
   }
 
-  private addButton(x: number, y: number, label: string, onClick: () => void, secondary = false): void {
-    const width = 330;
-    const height = 72;
+  private addStat(cx: number, panelW: number, y: number, label: string, value: string, compact: boolean): void {
+    const inset = compact ? 30 : 42;
+    const size = compact ? 18 : 20;
+    this.add.text(cx - panelW / 2 + inset, y, label, { fontFamily: FONT, fontSize: `${size}px`, color: INK.body, resolution: DPR }).setOrigin(0, 0.5);
+    this.add.text(cx + panelW / 2 - inset, y, value, { fontFamily: FONT, fontSize: `${size}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(1, 0.5);
+  }
+
+  private addButton(x: number, y: number, label: string, onClick: () => void, secondary = false, panelW = 500, compact = false): void {
+    const width = Math.min(panelW - 36, 330);
+    const height = compact ? 60 : 66;
     const button = this.add.container(x, y).setSize(width, height);
     const background = this.add.graphics();
     background.fillStyle(secondary ? FILLS.panelBorder : FILLS.button, 1);
     background.fillRoundedRect(-width / 2, -height / 2, width, height, 20);
-    button.add([background, this.addText(0, 0, label, 25, '#ffffff', true)]);
+    button.add([background, this.addText(0, 0, label, compact ? 20 : 22, '#ffffff', true)]);
     this.buttons.push({ bounds: new Phaser.Geom.Rectangle(x - width / 2, y - height / 2, width, height), action: onClick, visual: button });
   }
 

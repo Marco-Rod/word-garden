@@ -145,15 +145,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private computeLayout(): { cell: number; boardX: number; boardY: number } {
-    const availW = this.scale.width - LAYOUT.margin * 2;
+    const margin = this.scale.width < 500 ? 12 : LAYOUT.margin;
+    const availW = this.scale.width - margin * 2;
     this.wordAreaH = this.wordListLayout().areaH;
     const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
-    const cell = Phaser.Math.Clamp(Math.floor(Math.min(availW / this.puzzle.size, availH / this.puzzle.size)), 36, 100);
+    const cell = Phaser.Math.Clamp(Math.floor(Math.min(availW / this.puzzle.size, availH / this.puzzle.size)), 40, 112);
     const boardPx = cell * this.puzzle.size;
     return {
       cell,
       boardX: Math.floor((this.scale.width - boardPx) / 2),
-      boardY: Math.floor(this.wordAreaH - 8 + (availH - boardPx) / 2),
+      boardY: Math.floor(this.wordAreaH + Math.max(12, (availH - boardPx) * 0.08)),
     };
   }
 
@@ -171,9 +172,9 @@ export class GameScene extends Phaser.Scene {
     this.boardY = layout.boardY;
 
     this.headerText = this.add
-      .text(this.scale.width / 2, 28, `NIVEL ${this.level.id} 🌱`, {
+      .text(this.scale.width / 2, 24, `NIVEL ${this.level.id} 🌱`, {
         fontFamily: FONT,
-        fontSize: '30px',
+        fontSize: this.scale.width < 500 ? '26px' : '30px',
         color: INK.dark,
         fontStyle: 'bold',
         resolution: DPR,
@@ -221,7 +222,7 @@ export class GameScene extends Phaser.Scene {
 
   private buildPills(): void {
     const layout = this.wordListLayout();
-    const padY = 7;
+    const padY = this.scale.width < 500 ? 10 : 9;
 
     this.pillsOrder = this.puzzle.words.map((placed) => {
       const label = this.add.text(0, 0, placed.word, {
@@ -249,9 +250,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.wordCounter = this.add
-      .text(this.scale.width / 2, 28, `0 / ${this.puzzle.words.length} palabras`, {
+      .text(this.scale.width / 2, 47, `0 / ${this.puzzle.words.length} palabras`, {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: this.scale.width < 500 ? '16px' : '18px',
         color: INK.body,
         fontStyle: 'bold',
         resolution: DPR,
@@ -270,24 +271,24 @@ export class GameScene extends Phaser.Scene {
       const col = index % layout.columns;
       pill.container.setPosition(
         startX + col * (layout.columnW + layout.gap) + layout.columnW / 2,
-        57 + row * (pill.h + layout.gap) + pill.h / 2,
+        58 + row * (pill.h + layout.gap) + pill.h / 2,
       );
     }
-    this.wordCounter?.setPosition(this.scale.width / 2, 28);
+    this.wordCounter?.setPosition(this.scale.width / 2, 47);
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
-    const gap = 8;
-    const fontSize = this.scale.width < 400 ? 18 : 21;
-    const availableW = this.scale.width - LAYOUT.margin * 2;
+    const gap = this.scale.width < 500 ? 10 : 9;
+    const fontSize = this.scale.width < 500 ? 22 : 21;
+    const availableW = this.scale.width - (this.scale.width < 500 ? 28 : LAYOUT.margin * 2);
     const longestWord = Math.max(...this.puzzle.words.map((placed) => placed.word.length));
-    const minPillW = Math.ceil(longestWord * fontSize * 0.64 + 20);
+    const minPillW = Math.ceil(longestWord * fontSize * 0.64 + 28);
     let columns = Math.min(3, this.puzzle.words.length);
     while (columns > 1 && (availableW - gap * (columns - 1)) / columns < minPillW) columns--;
     const columnW = Math.floor((availableW - gap * (columns - 1)) / columns);
-    const rowH = fontSize + 14;
+    const rowH = fontSize + (fontSize >= 22 ? 20 : 18);
     const rows = Math.ceil(this.puzzle.words.length / columns);
-    return { columns, columnW, gap, fontSize, areaH: 57 + rows * rowH + Math.max(0, rows - 1) * gap + 10 };
+    return { columns, columnW, gap, fontSize, areaH: 58 + rows * rowH + Math.max(0, rows - 1) * gap + 14 };
   }
 
   private markPillFound(word: string): void {
@@ -330,7 +331,7 @@ export class GameScene extends Phaser.Scene {
     const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
     const boardPx = this.cell * this.puzzle.size;
     this.boardX = Math.floor((this.scale.width - boardPx) / 2);
-    this.boardY = Math.floor(this.wordAreaH - 8 + (availH - boardPx) / 2);
+    this.boardY = Math.floor(this.wordAreaH + Math.max(12, (availH - boardPx) * 0.08));
 
     for (let row = 0; row < this.tiles.length; row++) {
       for (let col = 0; col < this.tiles[row].length; col++) {
@@ -342,7 +343,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.recenterPills();
-    this.headerText?.setPosition(this.scale.width / 2, 28);
+    this.headerText?.setPosition(this.scale.width / 2, 24);
 
     if (this.feedbackText && this.feedbackPanel) {
       const cx = this.scale.width / 2;

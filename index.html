@@ -7,6 +7,8 @@
     <style>
       html,
       body {
+        width: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
         background: #8fd3ff;
@@ -14,11 +16,13 @@
         /* El juego controla los arrastres: no dejes que el navegador los convierta
            en desplazamiento o zoom y cambie el viewport durante un toque. */
         touch-action: none;
+        overflow: hidden;
         -webkit-tap-highlight-color: transparent;
       }
       #app {
         width: 100vw;
-        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
       }
       #app canvas {
         display: block;

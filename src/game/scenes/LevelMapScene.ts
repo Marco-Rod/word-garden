@@ -6,8 +6,8 @@ import { FILLS, FONT, INK } from '../config';
 import { MapEnvironment } from '../objects/MapEnvironment';
 
 const DPR = window.devicePixelRatio || 1;
-const MAP_HEIGHT = 1_470;
-const NODE_SPACING = 130;
+const DESKTOP_MAP_HEIGHT = 1_470;
+const DESKTOP_NODE_SPACING = 130;
 
 interface MapNode {
   levelId: number;
@@ -24,6 +24,9 @@ export class LevelMapScene extends Phaser.Scene {
   private dragStartY: number | null = null;
   private mapOffsetAtDragStart = 0;
   private dragged = false;
+  private mapHeight = DESKTOP_MAP_HEIGHT;
+  private nodeSpacing = DESKTOP_NODE_SPACING;
+  private mobileMap = false;
 
   constructor() {
     super('LevelMap');
@@ -41,6 +44,9 @@ export class LevelMapScene extends Phaser.Scene {
     this.children.removeAll(true);
     this.nodes = [];
     const width = this.scale.width;
+    this.mobileMap = width < 500;
+    this.nodeSpacing = this.mobileMap ? 180 : DESKTOP_NODE_SPACING;
+    this.mapHeight = this.nodeSpacing * 9 + 300;
     const progress = progressSystem.snapshot();
     const highest = Math.min(progress.highestUnlockedLevel, levelSystem.all().length);
     if (centerOnProgress) this.mapOffset = this.offsetNearLevel(highest);
@@ -50,21 +56,21 @@ export class LevelMapScene extends Phaser.Scene {
     const positions = levelSystem.all().map((level, index) => ({
       level,
       x: this.pathX(index),
-      y: MAP_HEIGHT - 150 - index * NODE_SPACING,
+      y: this.mapHeight - 150 - index * this.nodeSpacing,
     }));
     const path = positions.map(({ x, y }) => ({ x, y }));
     new MapEnvironment(this, this.map, {
       seed: 'world-1',
       width,
-      height: MAP_HEIGHT,
+      height: this.mapHeight,
       path,
-      nodeZones: positions.map(({ level, x, y }) => ({ x, y, radius: level.id === 10 ? 53 : 40 })),
+      nodeZones: positions.map(({ level, x, y }) => ({ x, y, radius: this.nodeRadius(level.id) })),
     }).draw();
     this.drawPath(path);
     for (const { level, x, y } of positions) {
       const unlocked = progressSystem.isUnlocked(level.id);
       const record = progress.levels[level.id];
-      const radius = level.id === 10 ? 53 : 40;
+      const radius = this.nodeRadius(level.id);
       this.drawNode(x, y, level.id, radius, unlocked, record);
       this.nodes.push({ levelId: level.id, x, y, radius, unlocked });
     }
@@ -79,9 +85,9 @@ export class LevelMapScene extends Phaser.Scene {
 
   private drawHeader(width: number, totalStars: number): void {
     const compact = width < 500;
-    const headerH = compact ? 58 : 70;
-    const titleY = compact ? 30 : 35;
-    const starsY = compact ? 51 : 62;
+    const headerH = compact ? 64 : 70;
+    const titleY = compact ? 31 : 35;
+    const starsY = compact ? 53 : 62;
     const header = this.add.graphics().setDepth(50);
     // La cabecera fija tapa por completo el recorrido que pasa por detrás;
     // así ningún nodo se percibe como cortado durante el desplazamiento.
@@ -89,19 +95,20 @@ export class LevelMapScene extends Phaser.Scene {
     header.fillRoundedRect(16, 10, width - 32, headerH, compact ? 18 : 22);
     header.lineStyle(3, FILLS.panelBorder, 0.9);
     header.strokeRoundedRect(16, 10, width - 32, headerH, compact ? 18 : 22);
-    this.addText(width / 2, titleY, '🌱 WORD GARDEN', compact ? 22 : 27, INK.dark, true).setDepth(51);
-    this.addText(width / 2, starsY, `⭐ ${totalStars} / ${levelSystem.all().length * 3}`, compact ? 15 : 18, INK.body, true).setDepth(51);
+    this.addText(width / 2, titleY, '🌱 WORD GARDEN', compact ? 24 : 27, INK.dark, true).setDepth(51);
+    this.addText(width / 2, starsY, `⭐ ${totalStars} / ${levelSystem.all().length * 3}`, compact ? 17 : 18, INK.body, true).setDepth(51);
     this.addText(width / 2, this.scale.height - 20, 'DESLIZA PARA EXPLORAR', 14, INK.dark, true).setDepth(51).setAlpha(0.75);
   }
 
   private drawPath(points: Array<{ x: number; y: number }>): void {
     if (!this.map) return;
     const path = this.add.graphics();
-    path.lineStyle(25, 0xb8834c, 0.72);
+    const widthScale = this.mobileMap ? 1.22 : 1;
+    path.lineStyle(25 * widthScale, 0xb8834c, 0.72);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
-    path.lineStyle(17, 0xf3d18a, 1);
+    path.lineStyle(17 * widthScale, 0xf3d18a, 1);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
-    path.lineStyle(3, 0xffecc0, 0.75);
+    path.lineStyle(3 * widthScale, 0xffecc0, 0.75);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
     this.map.add(path);
   }
@@ -185,8 +192,8 @@ export class LevelMapScene extends Phaser.Scene {
 
   private offsetNearLevel(levelId: number): number {
     const index = Math.max(0, levelId - 1);
-    const nodeY = MAP_HEIGHT - 150 - index * NODE_SPACING;
-    return Phaser.Math.Clamp(this.scale.height * 0.54 - nodeY, this.scale.height - MAP_HEIGHT + 20, 0);
+    const nodeY = this.mapHeight - 150 - index * this.nodeSpacing;
+    return Phaser.Math.Clamp(this.scale.height * 0.54 - nodeY, this.scale.height - this.mapHeight + 20, 0);
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
@@ -199,7 +206,7 @@ export class LevelMapScene extends Phaser.Scene {
     if (this.dragStartY === null || !this.map) return;
     const distance = pointer.worldY - this.dragStartY;
     if (Math.abs(distance) > 6) this.dragged = true;
-    this.mapOffset = Phaser.Math.Clamp(this.mapOffsetAtDragStart + distance, this.scale.height - MAP_HEIGHT + 20, 0);
+    this.mapOffset = Phaser.Math.Clamp(this.mapOffsetAtDragStart + distance, this.scale.height - this.mapHeight + 20, 0);
     this.map.setY(this.mapOffset);
   }
 
@@ -225,5 +232,10 @@ export class LevelMapScene extends Phaser.Scene {
       align: 'center',
       resolution: DPR,
     }).setOrigin(0.5);
+  }
+
+  private nodeRadius(levelId: number): number {
+    const scale = this.mobileMap ? 1.25 : 1;
+    return (levelId === 10 ? 53 : 40) * scale;
   }
 }
