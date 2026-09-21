@@ -4,7 +4,8 @@ import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelProgress } from '../../core/progression/ProgressRepository';
 import { FILLS, FONT, INK } from '../config';
 import { MapEnvironment } from '../objects/MapEnvironment';
-import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { createSafeText } from '../objects/SafeText';
 
 const DPR = window.devicePixelRatio || 1;
 const DESKTOP_MAP_HEIGHT = 1_470;
@@ -104,9 +105,8 @@ export class LevelMapScene extends Phaser.Scene {
     header.fillRoundedRect(16, 10, width - 32, headerH, compact ? 18 : 22);
     header.lineStyle(3, FILLS.panelBorder, 0.9);
     header.strokeRoundedRect(16, 10, width - 32, headerH, compact ? 18 : 22);
-    this.addText(width / 2, titleY, '🌱 WORD GARDEN', compact ? 24 : 27, INK.dark, true).setDepth(51);
-    this.totalStarsText = this.addText(width / 2, starsY, `⭐ ${totalStars} / ${levelSystem.all().length * 3}`, compact ? 17 : 18, INK.body, true).setDepth(51);
-    applyLayoutTextTest(this.totalStarsText);
+    this.addText(width / 2, titleY, '🌱 WORD GARDEN', compact ? 24 : 27, INK.dark, true, true).setDepth(51);
+    this.totalStarsText = this.addText(width / 2, starsY, `⭐ ${totalStars} / ${levelSystem.all().length * 3}`, compact ? 17 : 18, INK.body, true, true).setDepth(51);
     this.addText(width / 2, this.scale.height - 20, 'DESLIZA PARA EXPLORAR', 14, INK.dark, true).setDepth(51).setAlpha(0.75);
   }
 
@@ -151,7 +151,7 @@ export class LevelMapScene extends Phaser.Scene {
     node.add(drawing);
 
     if (completed) {
-      this.addNodeText(node, 0, -5, `${levelId}`, isChallenge ? 29 : 25, INK.dark, true);
+      this.addNodeText(node, 0, -5, `${levelId}`, isChallenge ? 29 : 25, INK.dark, true, true);
       this.addNodeText(node, 0, radius + 20, `${'⭐'.repeat(record.bestStars)}${'☆'.repeat(3 - record.bestStars)}`, 17, '#f9a825', true);
       this.addGardenGrowth(node, radius, record.bestStars);
       if (isChallenge) {
@@ -161,14 +161,14 @@ export class LevelMapScene extends Phaser.Scene {
       }
     } else if (unlocked) {
       this.addNodeText(node, 0, -7, isChallenge ? '🌟' : '▶', isChallenge ? 25 : 21, INK.dark, true);
-      this.addNodeText(node, 0, 20, `${levelId}`, isChallenge ? 27 : 22, INK.dark, true);
+      this.addNodeText(node, 0, 20, `${levelId}`, isChallenge ? 27 : 22, INK.dark, true, true);
       if (isChallenge) this.addNodeText(node, 0, radius + 24, 'DESAFÍO', 16, INK.dark, true);
       if (!isChallenge) {
         this.tweens.add({ targets: node, scale: 1.045, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
     } else {
       this.addNodeText(node, 0, -7, '🔒', 22, INK.white, true);
-      this.addNodeText(node, 0, 20, `${levelId}`, 21, INK.white, true);
+      this.addNodeText(node, 0, 20, `${levelId}`, 21, INK.white, true, true);
     }
     this.map.add(node);
     if (challengeHalo && !completed) {
@@ -190,8 +190,8 @@ export class LevelMapScene extends Phaser.Scene {
     node.add(plant);
   }
 
-  private addNodeText(node: Phaser.GameObjects.Container, x: number, y: number, text: string, size: number, color: string, bold: boolean): void {
-    node.add(this.addText(x, y, text, size, color, bold));
+  private addNodeText(node: Phaser.GameObjects.Container, x: number, y: number, text: string, size: number, color: string, bold: boolean, useSafeText = false): void {
+    node.add(this.addText(x, y, text, size, color, bold, useSafeText));
   }
 
   private pathX(index: number): number {
@@ -233,15 +233,16 @@ export class LevelMapScene extends Phaser.Scene {
     if (node) this.scene.start('Game', { levelId: node.levelId });
   }
 
-  private addText(x: number, y: number, text: string, size: number, color: string, bold = false): Phaser.GameObjects.Text {
-    return this.add.text(x, y, text, {
+  private addText(x: number, y: number, text: string, size: number, color: string, bold = false, useSafeText = false): Phaser.GameObjects.Text {
+    const style: Phaser.Types.GameObjects.Text.TextStyle = {
       fontFamily: FONT,
       fontSize: `${size}px`,
       color,
       fontStyle: bold ? 'bold' : undefined,
       align: 'center',
       resolution: DPR,
-    }).setOrigin(0.5);
+    };
+    return (useSafeText ? createSafeText(this, x, y, text, style) : this.add.text(x, y, text, style)).setOrigin(0.5);
   }
 
   private nodeRadius(levelId: number): number {

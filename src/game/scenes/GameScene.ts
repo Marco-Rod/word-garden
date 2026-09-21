@@ -8,7 +8,8 @@ import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
 import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
-import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { createSafeText } from '../objects/SafeText';
 import { WordSelection } from '../objects/WordSelection';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
@@ -176,8 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.boardX = layout.boardX;
     this.boardY = layout.boardY;
 
-    this.headerText = this.add
-      .text(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 18 : 24, `NIVEL ${this.level.id} 🌱`, {
+    this.headerText = createSafeText(this, this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 18 : 24, `NIVEL ${this.level.id} 🌱`, {
         fontFamily: FONT,
         fontSize: getLayoutMetrics(this.scale).isCompact ? '22px' : '30px',
         color: INK.dark,
@@ -185,7 +185,6 @@ export class GameScene extends Phaser.Scene {
         resolution: DPR,
       })
       .setOrigin(0.5);
-    applyLayoutTextTest(this.headerText);
 
     this.buildPills();
 
@@ -261,8 +260,7 @@ export class GameScene extends Phaser.Scene {
       return pill;
     });
 
-    this.wordCounter = this.add
-      .text(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 45 : 47, `0 / ${this.puzzle.words.length} palabras`, {
+    this.wordCounter = createSafeText(this, this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 47 : 47, `0 / ${this.puzzle.words.length} palabras`, {
         fontFamily: FONT,
         fontSize: getLayoutMetrics(this.scale).isCompact ? '16px' : '18px',
         color: INK.body,
@@ -270,7 +268,6 @@ export class GameScene extends Phaser.Scene {
         resolution: DPR,
       })
       .setOrigin(0.5);
-    applyLayoutTextTest(this.wordCounter);
 
     this.recenterPills();
   }
@@ -287,7 +284,7 @@ export class GameScene extends Phaser.Scene {
         58 + row * (pill.h + layout.gap) + pill.h / 2,
       );
     }
-    this.wordCounter?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 45 : 47);
+    this.wordCounter?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 47 : 47);
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {

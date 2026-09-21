@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { levelSystem } from '../../core/progression/levelProgression';
 import { FILLS, FONT, INK } from '../config';
 import { getLayoutMetrics } from '../layout/ResponsiveLayout';
-import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { createSafeText } from '../objects/SafeText';
 import type { GameSessionResult } from '../session/GameSession';
 
 export interface ResultSceneData {
@@ -66,7 +67,7 @@ export class ResultScene extends Phaser.Scene {
     if (isFinal) {
       this.addText(cx, top + 84, 'Completaste todos\nnuestros niveles 🌱', compact ? 21 : 24, INK.body);
     } else {
-      this.addText(cx, top + 78, `NIVEL ${result.levelId}`, compact ? 22 : 25, INK.body, true);
+      this.addText(cx, top + 78, `NIVEL ${result.levelId}`, compact ? 22 : 25, INK.body, true, true);
     }
 
     this.addStars(cx, top + (isFinal ? 145 : 128), result.stars, compact);
@@ -109,16 +110,16 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
-  private addText(x: number, y: number, text: string, size: number, color: string, bold = false, runTextTest = false): Phaser.GameObjects.Text {
-    const label = this.add.text(x, y, text, {
+  private addText(x: number, y: number, text: string, size: number, color: string, bold = false, useSafeText = false): Phaser.GameObjects.Text {
+    const style: Phaser.Types.GameObjects.Text.TextStyle = {
       fontFamily: FONT,
       fontSize: `${size}px`,
       color,
       fontStyle: bold ? 'bold' : undefined,
       align: 'center',
       resolution: DPR,
-    }).setOrigin(0.5);
-    if (runTextTest) applyLayoutTextTest(label);
+    };
+    const label = (useSafeText ? createSafeText(this, x, y, text, style) : this.add.text(x, y, text, style)).setOrigin(0.5);
     return label;
   }
 
@@ -126,9 +127,7 @@ export class ResultScene extends Phaser.Scene {
     const inset = compact ? 42 : 42;
     const size = compact ? 18 : 20;
     const labelText = this.add.text(cx - panelW / 2 + inset, y, label, { fontFamily: FONT, fontSize: `${size}px`, color: INK.body, resolution: DPR }).setOrigin(0, 0.5);
-    const valueText = this.add.text(cx + panelW / 2 - inset, y, value, { fontFamily: FONT, fontSize: `${size}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(1, 0.5);
-    applyLayoutTextTest(labelText);
-    applyLayoutTextTest(valueText);
+    const valueText = createSafeText(this, cx + panelW / 2 - inset, y, value, { fontFamily: FONT, fontSize: `${size}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(1, 0.5);
     return { label: labelText, value: valueText };
   }
 
