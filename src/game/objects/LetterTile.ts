@@ -1,17 +1,18 @@
 import Phaser from 'phaser';
+import { FILLS, OUTLINES, FONT, INK } from '../config';
 
 export type TileState = 'idle' | 'selected' | 'found';
 
-const FILLS: Record<TileState, number> = {
-  idle: 0xffffff,
-  selected: 0xffe082,
-  found: 0xa5d6a7,
+const STATE_FILLS: Record<TileState, number> = {
+  idle: FILLS.tileIdle,
+  selected: FILLS.tileSelected,
+  found: FILLS.tileFound,
 };
 
-const STROKES: Record<TileState, number> = {
-  idle: 0x29b6f6,
-  selected: 0xfb8c00,
-  found: 0x43a047,
+const STATE_STROKES: Record<TileState, number> = {
+  idle: OUTLINES.tileIdle,
+  selected: OUTLINES.tileSelected,
+  found: OUTLINES.tileFound,
 };
 
 export class LetterTile extends Phaser.GameObjects.Container {
@@ -40,9 +41,9 @@ export class LetterTile extends Phaser.GameObjects.Container {
     this.bg = scene.add.graphics();
     this.label = scene.add
       .text(0, 0, letter, {
-        fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Arial Rounded MT Bold", Arial, sans-serif',
+        fontFamily: FONT,
         fontSize: `${Math.round(size * 0.52)}px`,
-        color: '#5d4037',
+        color: INK.body,
         fontStyle: 'bold',
         resolution: window.devicePixelRatio || 1,
       })
@@ -90,9 +91,9 @@ export class LetterTile extends Phaser.GameObjects.Container {
     const h = this.height;
     const radius = Math.round(Math.min(w, h) * 0.18);
     this.bg.clear();
-    this.bg.fillStyle(FILLS[state], 1);
+    this.bg.fillStyle(STATE_FILLS[state], 1);
     this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, radius);
-    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * 0.05)), STROKES[state], 1);
+    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * 0.05)), STATE_STROKES[state], 1);
     this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
   }
 }

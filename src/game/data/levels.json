@@ -1,9 +1,0 @@
-[
-  {
-    "id": 1,
-    "world": "animals",
-    "size": 5,
-    "words": ["PERRO", "GATO", "OSO"],
-    "directions": ["right"]
-  }
-]
