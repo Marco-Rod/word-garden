@@ -4,6 +4,7 @@ import { BootScene } from './game/scenes/BootScene';
 import { GameScene } from './game/scenes/GameScene';
 import { ResultScene } from './game/scenes/ResultScene';
 import { TutorialScene } from './game/scenes/TutorialScene';
+import { LevelSelectScene } from './game/scenes/LevelSelectScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     antialias: true,
     roundPixels: true,
   },
-  scene: [BootScene, TutorialScene, GameScene, ResultScene],
+  scene: [BootScene, LevelSelectScene, TutorialScene, GameScene, ResultScene],
 };
 
 new Phaser.Game(config);

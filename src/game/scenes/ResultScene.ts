@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { levelSystem } from '../../core/progression/levelProgression';
 import { FILLS, FONT, INK } from '../config';
 import type { GameSessionResult } from '../session/GameSession';
-import { runProgress } from '../session/RunProgress';
 
 export interface ResultSceneData {
   result: GameSessionResult;
@@ -13,9 +12,7 @@ const DPR = window.devicePixelRatio || 1;
 
 export class ResultScene extends Phaser.Scene {
   private resultData!: ResultSceneData;
-  private buttonBounds: Phaser.Geom.Rectangle | null = null;
-  private buttonAction: (() => void) | null = null;
-  private buttonVisual: Phaser.GameObjects.Container | null = null;
+  private buttons: Array<{ bounds: Phaser.Geom.Rectangle; action: () => void; visual: Phaser.GameObjects.Container }> = [];
   private readonly refreshInputBounds = (): void => this.scale.updateBounds();
 
   constructor() {
@@ -43,15 +40,13 @@ export class ResultScene extends Phaser.Scene {
 
   private draw(): void {
     this.children.removeAll(true);
-    this.buttonBounds = null;
-    this.buttonAction = null;
-    this.buttonVisual = null;
+    this.buttons = [];
     const { result, totalScore } = this.resultData;
     const isFinal = !levelSystem.next(result.levelId);
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2;
     const panelW = Math.min(this.scale.width - 32, 500);
-    const panelH = Math.min(this.scale.height - 32, isFinal ? 500 : 530);
+    const panelH = Math.min(this.scale.height - 32, isFinal ? 500 : 590);
 
     const panel = this.add.graphics();
     panel.fillStyle(FILLS.panel, 0.97);
@@ -75,15 +70,16 @@ export class ResultScene extends Phaser.Scene {
       this.addText(cx, scoreY + 84, `Tiempo       ${Math.round(result.elapsedSeconds)}s`, 20, INK.body);
       this.addText(cx, scoreY + 114, `Errores      ${result.errors}`, 20, INK.body);
     }
-    this.addText(cx, cy + panelH / 2 - 120, `Total  ${totalScore.toLocaleString('es-MX')} puntos`, 22, INK.dark, true);
-    this.addButton(cx, cy + panelH / 2 - 54, isFinal ? 'JUGAR DE NUEVO' : 'SIGUIENTE NIVEL ▶', () => {
-      if (isFinal) {
-        runProgress.reset();
-        this.scene.start('Game', { levelId: 1 });
-      } else {
+    // Las acciones se anclan después de los datos de la partida. Así los dos
+    // botones conservan aire entre sí y no rozan el borde en pantallas bajas.
+    const totalY = scoreY + (isFinal ? 90 : 165);
+    this.addText(cx, totalY, `Total de esta partida  ${totalScore.toLocaleString('es-MX')} puntos`, 20, INK.dark, true);
+    if (!isFinal) {
+      this.addButton(cx, totalY + 68, 'SIGUIENTE NIVEL ▶', () => {
         this.scene.start('Game', { levelId: levelSystem.next(result.levelId)!.id });
-      }
-    });
+      });
+    }
+    this.addButton(cx, totalY + (isFinal ? 164 : 148), 'NIVELES', () => this.scene.start('LevelSelect'), true);
   }
 
   private addStars(x: number, y: number, earned: number): void {
@@ -105,30 +101,23 @@ export class ResultScene extends Phaser.Scene {
     }).setOrigin(0.5);
   }
 
-  private addButton(x: number, y: number, label: string, onClick: () => void): void {
+  private addButton(x: number, y: number, label: string, onClick: () => void, secondary = false): void {
     const width = 330;
     const height = 72;
     const button = this.add.container(x, y).setSize(width, height);
     const background = this.add.graphics();
-    background.fillStyle(FILLS.button, 1);
+    background.fillStyle(secondary ? FILLS.panelBorder : FILLS.button, 1);
     background.fillRoundedRect(-width / 2, -height / 2, width, height, 20);
     button.add([background, this.addText(0, 0, label, 25, '#ffffff', true)]);
-    this.buttonBounds = new Phaser.Geom.Rectangle(x - width / 2, y - height / 2, width, height);
-    this.buttonAction = onClick;
-    this.buttonVisual = button;
-  }
-
-  private isInsideButton(pointer: Phaser.Input.Pointer): boolean {
-    return this.buttonBounds !== null && Phaser.Geom.Rectangle.Contains(this.buttonBounds, pointer.worldX, pointer.worldY);
+    this.buttons.push({ bounds: new Phaser.Geom.Rectangle(x - width / 2, y - height / 2, width, height), action: onClick, visual: button });
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.isInsideButton(pointer)) this.buttonVisual?.setScale(0.96);
+    this.buttons.find(({ bounds }) => Phaser.Geom.Rectangle.Contains(bounds, pointer.worldX, pointer.worldY))?.visual.setScale(0.96);
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
-    const action = this.buttonAction;
-    this.buttonVisual?.setScale(1);
-    if (action && this.isInsideButton(pointer)) action();
+    for (const button of this.buttons) button.visual.setScale(1);
+    this.buttons.find(({ bounds }) => Phaser.Geom.Rectangle.Contains(bounds, pointer.worldX, pointer.worldY))?.action();
   }
 }

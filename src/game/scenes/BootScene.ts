@@ -6,6 +6,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start('Game', { levelId: 1 });
+    this.scene.start('LevelSelect');
   }
 }

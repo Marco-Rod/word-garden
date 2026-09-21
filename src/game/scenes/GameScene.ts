@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { generatePuzzle } from '../../core/puzzle/generator';
 import { matchSelection } from '../../core/puzzle/selection';
 import { levelSystem } from '../../core/progression/levelProgression';
+import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelDefinition, PlacedWord, Puzzle } from '../../core/puzzle/types';
 import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
 import { LetterTile } from '../objects/LetterTile';
@@ -62,6 +63,10 @@ export class GameScene extends Phaser.Scene {
   create(data: GameSceneData): void {
     const requestedLevel = levelSystem.get(data.levelId);
     if (!requestedLevel) throw new Error(`Unknown level ${data.levelId}`);
+    if (!progressSystem.isUnlocked(data.levelId)) {
+      this.scene.start('LevelSelect');
+      return;
+    }
     if (requestedLevel.tutorial && !data.tutorialAcknowledged) {
       this.scene.start('Tutorial', { levelId: data.levelId });
       return;
@@ -470,6 +475,12 @@ export class GameScene extends Phaser.Scene {
     this.isComplete = true;
     this.selection.clear();
     const result = this.session.complete();
+    progressSystem.completeLevel({
+      levelId: result.levelId,
+      stars: result.stars as 0 | 1 | 2 | 3,
+      score: result.score,
+      elapsedSeconds: result.elapsedSeconds,
+    });
     const totalScore = runProgress.add(result.score);
     this.scene.start('Result', { result, totalScore });
   }

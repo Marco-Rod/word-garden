@@ -49,10 +49,20 @@ export class TutorialScene extends Phaser.Scene {
     panel.lineStyle(4, FILLS.panelBorder, 1);
     panel.strokeRoundedRect(cx - panelW / 2, cy - panelH / 2, panelW, panelH, 28);
 
+    const top = cy - panelH / 2;
     const lineCount = message.split('\n').length;
-    this.addText(cx, cy - panelH / 2 + 48, title, 30, INK.dark, true);
-    this.addText(cx, cy - panelH / 2 + 108 + Math.max(0, lineCount - 2) * 12, message, 22, INK.body);
-    this.addExampleGrid(cx, type === 'final-challenge' ? cy + 60 : cy + 10, type);
+    const messageSize = type === 'final-challenge' ? 20 : 22;
+    const messageY = top + 108 + Math.max(0, lineCount - 2) * 12;
+    const estimatedMessageBottom = messageY + (lineCount * (messageSize + 3)) / 2;
+    const gridSize = type === 'final-challenge' ? 142 : 166;
+    const buttonY = cy + panelH / 2 - 52;
+    const earliestGridCenter = estimatedMessageBottom + 18 + gridSize / 2;
+    const latestGridCenter = buttonY - 49 - gridSize / 2;
+    const gridY = Math.max(earliestGridCenter, Math.min(latestGridCenter, (earliestGridCenter + latestGridCenter) / 2));
+
+    this.addText(cx, top + 48, title, 30, INK.dark, true);
+    this.addText(cx, messageY, message, messageSize, INK.body);
+    this.addExampleGrid(cx, gridY, type, type === 'final-challenge');
 
     const width = Math.min(panelW - 54, 320);
     const height = 70;
@@ -64,10 +74,10 @@ export class TutorialScene extends Phaser.Scene {
     this.buttonBounds = new Phaser.Geom.Rectangle(cx - width / 2, y - height / 2, width, height);
   }
 
-  private addExampleGrid(x: number, y: number, type: TutorialType): void {
+  private addExampleGrid(x: number, y: number, type: TutorialType, compact = false): void {
     const size = 5;
-    const cell = 30;
-    const gap = 4;
+    const cell = compact ? 26 : 30;
+    const gap = compact ? 3 : 4;
     const total = size * cell + (size - 1) * gap;
     const left = x - total / 2;
     const top = y - total / 2;
@@ -110,7 +120,7 @@ export class TutorialScene extends Phaser.Scene {
         tile.fillRoundedRect(px, py, cell, cell, 7);
         tile.lineStyle(2, color?.stroke ?? OUTLINES.tileIdle, 1);
         tile.strokeRoundedRect(px, py, cell, cell, 7);
-        if (letters[row][col]) this.addText(px + cell / 2, py + cell / 2, letters[row][col], 17, INK.body, true);
+        if (letters[row][col]) this.addText(px + cell / 2, py + cell / 2, letters[row][col], compact ? 15 : 17, INK.body, true);
       }
     }
   }
