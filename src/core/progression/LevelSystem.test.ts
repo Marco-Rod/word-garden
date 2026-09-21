@@ -25,11 +25,19 @@ describe('LevelSystem', () => {
     }
   });
 
-  it('introduces intersections across the official mid-game levels', () => {
-    const intersections = system.all()
-      .filter((candidate) => candidate.id >= 5)
-      .map((level) => generatePuzzle(level).stats.intersections);
-    expect(intersections.some((count) => count > 0)).toBe(true);
-    expect(intersections[intersections.length - 1]).toBeGreaterThan(0);
+  it('meets the official minimum intersections from levels 5 to 10', () => {
+    for (const level of system.all().filter((candidate) => candidate.id >= 5)) {
+      const puzzle = generatePuzzle(level);
+      expect(puzzle.stats.intersections, `level ${level.id}`).toBeGreaterThanOrEqual(level.minIntersections);
+    }
+  });
+
+  it('uses every enabled direction in the advanced official levels', () => {
+    for (const level of system.all().filter((candidate) => candidate.id >= 8)) {
+      const usage = generatePuzzle(level).stats.directionUsage;
+      for (const direction of level.directions) {
+        expect(usage[direction], `level ${level.id}: ${direction}`).toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 });

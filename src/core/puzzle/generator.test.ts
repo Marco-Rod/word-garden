@@ -69,6 +69,20 @@ describe('generatePuzzle', () => {
     expect(puzzles.every(validatePuzzle)).toBe(true);
   });
 
+  it('reports direction usage and quality for every generated puzzle', () => {
+    const puzzle = generatePuzzle({
+      size: 7,
+      words: ['LUNA', 'SOL', 'PLAYA', 'RIO'],
+      directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'],
+      intersectionPreference: 0.8,
+      minIntersections: 2,
+      directionBalance: 0.8,
+      seed: 99,
+    });
+    expect(puzzle.stats.qualityScore).toBeGreaterThan(0);
+    expect(Object.values(puzzle.stats.directionUsage).reduce((sum, count) => sum + count, 0)).toBe(4);
+  });
+
   it('normalizes words to uppercase', () => {
     const puzzle = generatePuzzle({ ...LEVEL_1, words: ['gato', 'oso'] });
     expect(puzzle.words.map((w) => w.word).sort()).toEqual(['GATO', 'OSO']);

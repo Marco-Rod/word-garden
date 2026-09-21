@@ -50,38 +50,22 @@ export class WordSelection {
     const dRow = worldY - origin.y;
     const dCol = worldX - origin.x;
 
-    let dir = this.locked;
-    if (!dir) {
-      const snapped = bestAllowedDirection(this.allowedDirections, dRow, dCol);
-      if (!snapped) return;
-      this.locked = snapped;
-      dir = snapped;
-    }
+    // Un dedo raramente inicia un arrastre en la dirección exacta. Recalculamos
+    // la previsualización desde el origen para que un micro-movimiento inicial
+    // no bloquee permanentemente una palabra horizontal, vertical o diagonal.
+    const dir = bestAllowedDirection(this.allowedDirections, dRow, dCol);
+    if (!dir) return;
+    this.locked = dir;
 
-    let projection = projectGesture(dir, dRow, dCol);
+    const projection = projectGesture(dir, dRow, dCol);
     if (projection.perp / this.cellSize > this.toleranceCells) return;
 
-    let steps = this.clampByEdges(
-      origin,
-      dir,
-      cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
-    );
-
-    if (steps === 0 && this.locked === dir) {
-      const alt = bestAllowedDirection(this.allowedDirections, dRow, dCol);
-      if (alt && alt !== dir) {
-        this.locked = alt;
-        dir = alt;
-        projection = projectGesture(alt, dRow, dCol);
-        if (projection.perp / this.cellSize <= this.toleranceCells) {
-          steps = this.clampByEdges(
-            origin,
-            dir,
-            cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
-          );
-        }
-      }
-    }
+    const delta = DIRECTION_DELTAS[dir];
+    // La proyección usa un vector unitario. En diagonal, un paso de celda
+    // mide √2 × cellSize; sin esta normalización dos pasos se redondeaban a
+    // tres y palabras como SOL nunca coincidían exactamente.
+    const stepDistance = this.cellSize * Math.hypot(delta.row, delta.col);
+    const steps = this.clampByEdges(origin, dir, cellPrefixSteps(projection.t / stepDistance, this.maxSteps));
 
     this.applyPrefix(origin, dir, steps);
   }

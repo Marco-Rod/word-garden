@@ -101,6 +101,8 @@ export class GameScene extends Phaser.Scene {
       words: level.words,
       directions: level.directions,
       intersectionPreference: level.intersectionPreference,
+      minIntersections: level.minIntersections,
+      directionBalance: level.directionBalance,
       seed: level.seed,
     });
 
@@ -357,9 +359,13 @@ export class GameScene extends Phaser.Scene {
     this.selection.moveTo(pointer.worldX, pointer.worldY);
   }
 
-  private onPointerUp(_pointer: Phaser.Input.Pointer): void {
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
     this.pointerDown = false;
     if (!this.selection.isActive() || this.isComplete) return;
+
+    // En arrastres rápidos algunos navegadores no emiten un pointermove final.
+    // El punto del levantamiento es la fuente de verdad para cerrar el gesto.
+    this.selection.moveTo(pointer.worldX, pointer.worldY);
 
     const cells = this.selection.tiles.map((tile) => ({ row: tile.row, col: tile.col }));
     const remaining = this.puzzle.words.filter((word) => !this.foundWords.has(word.word));

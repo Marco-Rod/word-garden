@@ -24,7 +24,15 @@ export interface Puzzle {
   words: PlacedWord[];
   stats: {
     intersections: number;
+    directionUsage: Record<Direction, number>;
+    qualityScore: number;
   };
+}
+
+export interface PuzzleDifficulty {
+  intersectionPreference: number;
+  minIntersections: number;
+  directionBalance: number;
 }
 
 export interface PuzzleOptions {
@@ -32,14 +40,15 @@ export interface PuzzleOptions {
   words: string[];
   directions?: Direction[];
   intersectionPreference?: number;
+  minIntersections?: number;
+  directionBalance?: number;
   seed: number;
 }
 
-export interface LevelDefinition {
+export interface LevelDefinition extends PuzzleDifficulty {
   id: number;
   size: number;
   words: string[];
   directions: Direction[];
-  intersectionPreference: number;
   seed: number;
 }
