@@ -1,9 +1,4 @@
-import type { LevelDefinition } from '../core/puzzle/types';
+import { LEVELS } from './levels';
 
-export const level1: LevelDefinition = {
-  id: 1,
-  size: 5,
-  words: ['GATO', 'OSO', 'PATO'],
-  directions: ['RIGHT'],
-  seed: 1001,
-};
+// Compatibilidad temporal mientras GameScene se conecta a LevelSystem.
+export const level1 = LEVELS[0];
