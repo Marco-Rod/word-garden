@@ -5,6 +5,7 @@ import { levelSystem } from '../../core/progression/levelProgression';
 import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelDefinition, PlacedWord, Puzzle } from '../../core/puzzle/types';
 import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
+import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
@@ -145,8 +146,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private computeLayout(): { cell: number; boardX: number; boardY: number } {
-    const margin = this.scale.width < 500 ? 12 : LAYOUT.margin;
-    const availW = this.scale.width - margin * 2;
+    const responsive = getLayoutMetrics(this.scale);
+    const availW = responsive.contentWidth;
     this.wordAreaH = this.wordListLayout().areaH;
     const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
     const cell = Phaser.Math.Clamp(Math.floor(Math.min(availW / this.puzzle.size, availH / this.puzzle.size)), 40, 112);
@@ -172,9 +173,9 @@ export class GameScene extends Phaser.Scene {
     this.boardY = layout.boardY;
 
     this.headerText = this.add
-      .text(this.scale.width / 2, this.scale.width < 500 ? 18 : 24, `NIVEL ${this.level.id} 🌱`, {
+      .text(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 18 : 24, `NIVEL ${this.level.id} 🌱`, {
         fontFamily: FONT,
-        fontSize: this.scale.width < 500 ? '22px' : '30px',
+        fontSize: getLayoutMetrics(this.scale).isCompact ? '22px' : '30px',
         color: INK.dark,
         fontStyle: 'bold',
         resolution: DPR,
@@ -250,9 +251,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.wordCounter = this.add
-      .text(this.scale.width / 2, this.scale.width < 500 ? 45 : 47, `0 / ${this.puzzle.words.length} palabras`, {
+      .text(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 45 : 47, `0 / ${this.puzzle.words.length} palabras`, {
         fontFamily: FONT,
-        fontSize: this.scale.width < 500 ? '16px' : '18px',
+        fontSize: getLayoutMetrics(this.scale).isCompact ? '16px' : '18px',
         color: INK.body,
         fontStyle: 'bold',
         resolution: DPR,
@@ -274,13 +275,14 @@ export class GameScene extends Phaser.Scene {
         58 + row * (pill.h + layout.gap) + pill.h / 2,
       );
     }
-    this.wordCounter?.setPosition(this.scale.width / 2, this.scale.width < 500 ? 45 : 47);
+    this.wordCounter?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 45 : 47);
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
-    const gap = this.scale.width < 500 ? 10 : 9;
-    const fontSize = this.scale.width < 500 ? 22 : 21;
-    const availableW = this.scale.width - (this.scale.width < 500 ? 28 : LAYOUT.margin * 2);
+    const responsive = getLayoutMetrics(this.scale);
+    const gap = responsive.isCompact ? 10 : 9;
+    const fontSize = responsive.isCompact ? 22 : 21;
+    const availableW = responsive.contentWidth - (responsive.isCompact ? 4 : 8);
     const longestWord = Math.max(...this.puzzle.words.map((placed) => placed.word.length));
     const minPillW = Math.ceil(longestWord * fontSize * 0.64 + 28);
     let columns = Math.min(3, this.puzzle.words.length);
@@ -343,7 +345,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.recenterPills();
-    this.headerText?.setPosition(this.scale.width / 2, this.scale.width < 500 ? 18 : 24);
+    this.headerText?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 18 : 24);
 
     if (this.feedbackText && this.feedbackPanel) {
       const cx = this.scale.width / 2;

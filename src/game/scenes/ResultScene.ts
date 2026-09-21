@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { levelSystem } from '../../core/progression/levelProgression';
 import { FILLS, FONT, INK } from '../config';
+import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import type { GameSessionResult } from '../session/GameSession';
 
 export interface ResultSceneData {
@@ -43,11 +44,12 @@ export class ResultScene extends Phaser.Scene {
     this.buttons = [];
     const { result, totalScore } = this.resultData;
     const isFinal = !levelSystem.next(result.levelId);
-    const compact = this.scale.width < 430;
-    const cx = this.scale.width / 2;
-    const cy = this.scale.height / 2;
-    const panelW = Math.min(this.scale.width - 24, 500);
-    const panelH = Math.min(this.scale.height - 20, isFinal ? 410 : 510);
+    const layout = getLayoutMetrics(this.scale);
+    const compact = layout.isCompact;
+    const cx = layout.width / 2;
+    const cy = layout.height / 2;
+    const panelW = Math.min(layout.contentWidth, 500);
+    const panelH = Math.min(layout.contentHeight, isFinal ? 410 : 510);
     const top = cy - panelH / 2;
 
     const panel = this.add.graphics();

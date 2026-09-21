@@ -30,4 +30,18 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, LevelMapScene, TutorialScene, GameScene, ResultScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Safari cambia el viewport disponible cuando muestra u oculta sus barras.
+// Phaser debe recibir ese tamaño efectivo, no la resolución física del iPhone.
+const refreshViewport = (): void => {
+  const viewport = window.visualViewport;
+  game.scale.resize(Math.round(viewport?.width ?? window.innerWidth), Math.round(viewport?.height ?? window.innerHeight));
+  game.scale.updateBounds();
+};
+
+window.visualViewport?.addEventListener('resize', refreshViewport);
+window.visualViewport?.addEventListener('scroll', refreshViewport);
+window.addEventListener('resize', refreshViewport);
+window.addEventListener('orientationchange', refreshViewport);
+window.requestAnimationFrame(refreshViewport);
