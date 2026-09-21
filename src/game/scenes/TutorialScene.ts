@@ -50,8 +50,12 @@ export class TutorialScene extends Phaser.Scene {
     panel.strokeRoundedRect(cx - panelW / 2, cy - panelH / 2, panelW, panelH, 28);
 
     const top = cy - panelH / 2;
+    const mobile = this.scale.width < 500;
     const lineCount = message.split('\n').length;
-    const messageSize = type === 'final-challenge' ? 20 : 22;
+    const messageSize = type === 'final-challenge' ? (mobile ? 18 : 20) : (mobile ? 20 : 22);
+    const titleSize = mobile
+      ? Phaser.Math.Clamp(Math.floor((panelW - 28) / (title.length * 0.75)), 21, 26)
+      : 30;
     const messageY = top + 108 + Math.max(0, lineCount - 2) * 12;
     const estimatedMessageBottom = messageY + (lineCount * (messageSize + 3)) / 2;
     const gridSize = type === 'final-challenge' ? 142 : 166;
@@ -60,7 +64,7 @@ export class TutorialScene extends Phaser.Scene {
     const latestGridCenter = buttonY - 49 - gridSize / 2;
     const gridY = Math.max(earliestGridCenter, Math.min(latestGridCenter, (earliestGridCenter + latestGridCenter) / 2));
 
-    this.addText(cx, top + 48, title, 30, INK.dark, true);
+    this.addText(cx, top + 48, title, titleSize, INK.dark, true);
     this.addText(cx, messageY, message, messageSize, INK.body);
     this.addExampleGrid(cx, gridY, type, type === 'final-challenge');
 

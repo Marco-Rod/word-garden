@@ -104,7 +104,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private addStat(cx: number, panelW: number, y: number, label: string, value: string, compact: boolean): void {
-    const inset = compact ? 30 : 42;
+    const inset = compact ? 42 : 42;
     const size = compact ? 18 : 20;
     this.add.text(cx - panelW / 2 + inset, y, label, { fontFamily: FONT, fontSize: `${size}px`, color: INK.body, resolution: DPR }).setOrigin(0, 0.5);
     this.add.text(cx + panelW / 2 - inset, y, value, { fontFamily: FONT, fontSize: `${size}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(1, 0.5);

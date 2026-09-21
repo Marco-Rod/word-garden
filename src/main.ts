@@ -22,7 +22,10 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   render: {
     antialias: true,
-    roundPixels: true,
+    antialiasGL: true,
+    // Este juego usa formas y tipografía suave, no arte de píxel. Evitar el
+    // redondeo de píxeles elimina el aspecto dentado al escalar Safari.
+    roundPixels: false,
   },
   scene: [BootScene, LevelMapScene, TutorialScene, GameScene, ResultScene],
 };

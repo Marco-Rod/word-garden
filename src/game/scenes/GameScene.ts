@@ -172,9 +172,9 @@ export class GameScene extends Phaser.Scene {
     this.boardY = layout.boardY;
 
     this.headerText = this.add
-      .text(this.scale.width / 2, 24, `NIVEL ${this.level.id} 🌱`, {
+      .text(this.scale.width / 2, this.scale.width < 500 ? 18 : 24, `NIVEL ${this.level.id} 🌱`, {
         fontFamily: FONT,
-        fontSize: this.scale.width < 500 ? '26px' : '30px',
+        fontSize: this.scale.width < 500 ? '22px' : '30px',
         color: INK.dark,
         fontStyle: 'bold',
         resolution: DPR,
@@ -250,7 +250,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.wordCounter = this.add
-      .text(this.scale.width / 2, 47, `0 / ${this.puzzle.words.length} palabras`, {
+      .text(this.scale.width / 2, this.scale.width < 500 ? 45 : 47, `0 / ${this.puzzle.words.length} palabras`, {
         fontFamily: FONT,
         fontSize: this.scale.width < 500 ? '16px' : '18px',
         color: INK.body,
@@ -274,7 +274,7 @@ export class GameScene extends Phaser.Scene {
         58 + row * (pill.h + layout.gap) + pill.h / 2,
       );
     }
-    this.wordCounter?.setPosition(this.scale.width / 2, 47);
+    this.wordCounter?.setPosition(this.scale.width / 2, this.scale.width < 500 ? 45 : 47);
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
@@ -343,7 +343,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.recenterPills();
-    this.headerText?.setPosition(this.scale.width / 2, 24);
+    this.headerText?.setPosition(this.scale.width / 2, this.scale.width < 500 ? 18 : 24);
 
     if (this.feedbackText && this.feedbackPanel) {
       const cx = this.scale.width / 2;
