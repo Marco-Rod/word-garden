@@ -11,12 +11,18 @@
         padding: 0;
         background: #8fd3ff;
         overscroll-behavior: none;
-        touch-action: manipulation;
+        /* El juego controla los arrastres: no dejes que el navegador los convierta
+           en desplazamiento o zoom y cambie el viewport durante un toque. */
+        touch-action: none;
         -webkit-tap-highlight-color: transparent;
       }
       #app {
         width: 100vw;
         height: 100vh;
+      }
+      #app canvas {
+        display: block;
+        touch-action: none;
       }
     </style>
   </head>

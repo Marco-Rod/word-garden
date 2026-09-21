@@ -12,6 +12,11 @@ const config: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     autoRound: true,
   },
+  input: {
+    touch: {
+      capture: true,
+    },
+  },
   render: {
     antialias: true,
     roundPixels: true,

@@ -5,6 +5,7 @@ import { matchSelection } from '../../core/puzzle/selection';
 import type { PlacedWord, Puzzle } from '../../core/puzzle/types';
 import { FILLS, FONT, INK, LAYOUT } from '../config';
 import { LetterTile } from '../objects/LetterTile';
+import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
 
 interface Pill {
@@ -32,24 +33,54 @@ export class GameScene extends Phaser.Scene {
   private isComplete = false;
   private replayButton: Phaser.GameObjects.Container | null = null;
   private overlay: Phaser.GameObjects.Container | null = null;
+  private debugTouch = false;
+  private debugTouchOverlay: TouchDebugOverlay | null = null;
 
   private headerText: Phaser.GameObjects.Text | null = null;
   private feedbackPanel: Phaser.GameObjects.Graphics | null = null;
   private feedbackText: Phaser.GameObjects.Text | null = null;
+  private readonly refreshInputBounds = (): void => this.scale.updateBounds();
 
   constructor() {
     super('Game');
   }
 
   create(): void {
-    this.input.on('gameobjectdown', this.onObjectDown, this);
+    this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
     this.input.on('gameobjectup', this.onObjectUp, this);
 
     this.scale.on('resize', this.recenter, this);
 
+    // En móvil el rectángulo CSS del canvas puede moverse cuando aparece u
+    // oculta la barra del navegador, sin que Phaser reciba un resize del juego.
+    // La captura asegura que el rectángulo se refresque antes de que Phaser
+    // transforme este mismo pointerdown a coordenadas del mundo.
+    this.game.canvas.addEventListener('pointerdown', this.refreshInputBounds, {
+      capture: true,
+      passive: true,
+    });
+    window.visualViewport?.addEventListener('resize', this.refreshInputBounds);
+    window.visualViewport?.addEventListener('scroll', this.refreshInputBounds);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroyInputBoundsSync, this);
+    this.scale.updateBounds();
+
+    this.debugTouch = new URLSearchParams(window.location.search).has('debugTouch');
+
     this.loadLevel();
+  }
+
+  private destroyInputBoundsSync(): void {
+    this.game.canvas.removeEventListener('pointerdown', this.refreshInputBounds, true);
+    window.visualViewport?.removeEventListener('resize', this.refreshInputBounds);
+    window.visualViewport?.removeEventListener('scroll', this.refreshInputBounds);
+  }
+
+  private ensureDebugOverlay(): void {
+    this.debugTouchOverlay?.destroy();
+    this.debugTouchOverlay = null;
+    if (this.debugTouch) this.debugTouchOverlay = new TouchDebugOverlay(this);
   }
 
   private loadLevel(): void {
@@ -68,6 +99,7 @@ export class GameScene extends Phaser.Scene {
     this.overlay = null;
 
     this.buildBoard();
+    this.ensureDebugOverlay();
   }
 
   private computeLayout(): { cell: number; boardX: number; boardY: number } {
@@ -235,12 +267,31 @@ export class GameScene extends Phaser.Scene {
     this.overlay?.setPosition(this.scale.width / 2, this.scale.height / 2);
   }
 
-  private onObjectDown(_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject): void {
-    if (gameObject instanceof LetterTile) {
-      this.pointerDown = true;
-      if (this.isComplete) return;
-      this.selection.startAt(gameObject);
-    }
+  private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (this.isComplete) return;
+
+    // No usamos el gameobjectdown para iniciar una palabra: los bounds de un
+    // objeto interactivo pueden quedar desfasados respecto al canvas durante
+    // un resize móvil. La cuadrícula sí es la fuente de verdad visual.
+    const tile = this.tileNearestTo(pointer.worldX, pointer.worldY);
+    if (!tile) return;
+
+    this.pointerDown = true;
+    this.selection.startAt(tile);
+  }
+
+  private tileNearestTo(worldX: number, worldY: number): LetterTile | null {
+    if (this.cell === 0) return null;
+
+    // Selecciona la letra cuyo centro está más cerca del puntero, siempre que
+    // el punto permanezca dentro de la caja visual de esa letra.
+    const col = Math.round((worldX - this.boardX - this.cell / 2) / this.cell);
+    const row = Math.round((worldY - this.boardY - this.cell / 2) / this.cell);
+    const tile = this.tiles[row]?.[col];
+    if (!tile) return null;
+
+    const half = this.cell / 2;
+    return Math.abs(worldX - tile.x) <= half && Math.abs(worldY - tile.y) <= half ? tile : null;
   }
 
   private onObjectUp(_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject): void {
