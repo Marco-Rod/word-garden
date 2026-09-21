@@ -8,6 +8,7 @@ import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
 import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
+import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
@@ -51,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private isComplete = false;
   private debugTouch = false;
   private debugTouchOverlay: TouchDebugOverlay | null = null;
+  private layoutDebugOverlay: LayoutDebugOverlay | null = null;
 
   private headerText: Phaser.GameObjects.Text | null = null;
   private feedbackPanel: Phaser.GameObjects.Graphics | null = null;
@@ -160,6 +162,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildBoard(): void {
+    this.layoutDebugOverlay?.destroy();
+    this.layoutDebugOverlay = null;
     this.children.removeAll(true);
     this.pillsByWord.clear();
     this.pillsOrder = [];
@@ -219,6 +223,12 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0)
       .setDepth(100);
+
+    if (isLayoutDebugEnabled() && this.headerText && this.wordCounter) {
+      this.layoutDebugOverlay = new LayoutDebugOverlay(this);
+      this.layoutDebugOverlay.track('Game.levelTitle', this.headerText);
+      this.layoutDebugOverlay.track('Game.wordProgress', this.wordCounter);
+    }
   }
 
   private buildPills(): void {
