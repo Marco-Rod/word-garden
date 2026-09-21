@@ -40,4 +40,13 @@ describe('LevelSystem', () => {
       }
     }
   });
+
+  it('meets the advanced composition requirements for intersections and spread', () => {
+    for (const level of system.all().filter((candidate) => candidate.id >= 8)) {
+      const stats = generatePuzzle(level).stats;
+      expect(stats.intersectingWords, `level ${level.id}`).toBeGreaterThanOrEqual(level.minIntersectingWords!);
+      const usage = level.directions.map((direction) => stats.directionUsage[direction]);
+      expect(Math.max(...usage) - Math.min(...usage), `level ${level.id}`).toBeLessThanOrEqual(level.maxDirectionSpread!);
+    }
+  });
 });

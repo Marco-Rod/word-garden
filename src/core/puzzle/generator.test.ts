@@ -80,6 +80,7 @@ describe('generatePuzzle', () => {
       seed: 99,
     });
     expect(puzzle.stats.qualityScore).toBeGreaterThan(0);
+    expect(puzzle.stats.intersectingWords).toBeGreaterThanOrEqual(0);
     expect(Object.values(puzzle.stats.directionUsage).reduce((sum, count) => sum + count, 0)).toBe(4);
   });
 

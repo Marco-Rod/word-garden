@@ -24,6 +24,7 @@ export interface Puzzle {
   words: PlacedWord[];
   stats: {
     intersections: number;
+    intersectingWords: number;
     directionUsage: Record<Direction, number>;
     qualityScore: number;
   };
@@ -33,6 +34,8 @@ export interface PuzzleDifficulty {
   intersectionPreference: number;
   minIntersections: number;
   directionBalance: number;
+  minIntersectingWords?: number;
+  maxDirectionSpread?: number;
 }
 
 export interface PuzzleOptions {
@@ -42,6 +45,8 @@ export interface PuzzleOptions {
   intersectionPreference?: number;
   minIntersections?: number;
   directionBalance?: number;
+  minIntersectingWords?: number;
+  maxDirectionSpread?: number;
   seed: number;
 }
 

@@ -103,8 +103,13 @@ export class GameScene extends Phaser.Scene {
       intersectionPreference: level.intersectionPreference,
       minIntersections: level.minIntersections,
       directionBalance: level.directionBalance,
+      minIntersectingWords: level.minIntersectingWords,
+      maxDirectionSpread: level.maxDirectionSpread,
       seed: level.seed,
     });
+    if (this.level.id >= 8 && new URLSearchParams(window.location.search).has('debugPuzzle')) {
+      console.info(`LEVEL ${this.level.id}`, this.puzzle.stats);
+    }
 
     this.isComplete = false;
     this.pointerDown = false;

@@ -9,7 +9,7 @@ export const LEVELS: readonly LevelDefinition[] = [
   { id: 5, size: 6, words: [...WORD_SETS.level5], directions: ['RIGHT', 'DOWN'], intersectionPreference: 0.45, minIntersections: 1, directionBalance: 0.25, seed: 1005 },
   { id: 6, size: 6, words: [...WORD_SETS.level6], directions: ['RIGHT', 'DOWN'], intersectionPreference: 0.55, minIntersections: 1, directionBalance: 0.5, seed: 1006 },
   { id: 7, size: 7, words: [...WORD_SETS.level7], directions: ['RIGHT', 'DOWN'], intersectionPreference: 0.65, minIntersections: 2, directionBalance: 0.5, seed: 1007 },
-  { id: 8, size: 7, words: [...WORD_SETS.level8], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.75, minIntersections: 2, directionBalance: 0.8, seed: 1008 },
-  { id: 9, size: 7, words: [...WORD_SETS.level9], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.85, minIntersections: 3, directionBalance: 0.8, seed: 1009 },
-  { id: 10, size: 8, words: [...WORD_SETS.level10], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.9, minIntersections: 4, directionBalance: 0.8, seed: 1010 },
+  { id: 8, size: 7, words: [...WORD_SETS.level8], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.75, minIntersections: 2, directionBalance: 0.8, minIntersectingWords: 3, maxDirectionSpread: 2, seed: 1008 },
+  { id: 9, size: 7, words: [...WORD_SETS.level9], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.85, minIntersections: 3, directionBalance: 0.8, minIntersectingWords: 4, maxDirectionSpread: 2, seed: 1009 },
+  { id: 10, size: 8, words: [...WORD_SETS.level10], directions: ['RIGHT', 'DOWN', 'DIAGONAL_DOWN_RIGHT'], intersectionPreference: 0.9, minIntersections: 4, directionBalance: 0.8, minIntersectingWords: 5, maxDirectionSpread: 2, seed: 1010 },
 ];

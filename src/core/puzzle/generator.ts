@@ -25,6 +25,7 @@ interface PuzzleCandidate {
   grid: string[][];
   words: PlacedWord[];
   intersections: number;
+  intersectingWords: number;
   directionUsage: DirectionUsage;
   qualityScore: number;
 }
@@ -66,19 +67,19 @@ export function generatePuzzle(options: PuzzleOptions): Puzzle {
   const directions = options.directions ?? ['RIGHT'];
   const intersectionPreference = clamp(options.intersectionPreference ?? 0, 0, 1);
   const minIntersections = Math.max(0, Math.floor(options.minIntersections ?? 0));
+  const minIntersectingWords = Math.max(0, Math.floor(options.minIntersectingWords ?? 0));
+  const maxDirectionSpread = Math.max(0, options.maxDirectionSpread ?? Number.POSITIVE_INFINITY);
   const directionBalance = clamp(options.directionBalance ?? 0, 0, 1);
   const words = normalizeWords(options.words).sort((a, b) => b.length - a.length);
   const rng = mulberry32(seed);
   const attempts = size * size * 4;
   let best: PuzzleCandidate | null = null;
-  let bestMeetingMinimum: PuzzleCandidate | null = null;
-  let bestMeetingDirectionBalance: PuzzleCandidate | null = null;
+  let bestMeetingRequirements: PuzzleCandidate | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     const candidateGrid = createGrid(size);
     const candidatePlaced: PlacedWord[] = [];
     const directionUsage = emptyDirectionUsage();
-    let candidateIntersections = 0;
     let failed = false;
 
     for (const word of words) {
@@ -89,36 +90,38 @@ export function generatePuzzle(options: PuzzleOptions): Puzzle {
       }
       const chosen = chooseCandidate(candidates, intersectionPreference, directionBalance, directionUsage, rng);
       candidatePlaced.push(placeWord(candidateGrid, word, chosen.start, chosen.direction));
-      candidateIntersections += chosen.intersections;
       directionUsage[chosen.direction]++;
     }
     if (!failed) {
+      const intersectionMetrics = measureIntersections(candidatePlaced);
       const candidate: PuzzleCandidate = {
         grid: candidateGrid,
         words: candidatePlaced,
-        intersections: candidateIntersections,
+        intersections: intersectionMetrics.intersections,
+        intersectingWords: intersectionMetrics.intersectingWords,
         directionUsage,
-        qualityScore: qualityScore(candidateIntersections, directionUsage, directions, directionBalance),
+        qualityScore: qualityScore(
+          intersectionMetrics.intersections,
+          intersectionMetrics.intersectingWords,
+          directionUsage,
+          directions,
+          directionBalance,
+        ),
       };
       if (!best || candidate.qualityScore > best.qualityScore) best = candidate;
-      if (candidate.intersections >= minIntersections && (!bestMeetingMinimum || candidate.qualityScore > bestMeetingMinimum.qualityScore)) {
-        bestMeetingMinimum = candidate;
-      }
       if (
-        candidate.intersections >= minIntersections &&
-        directionBalance >= 0.75 &&
-        usesEveryDirection(candidate.directionUsage, directions) &&
-        (!bestMeetingDirectionBalance || candidate.qualityScore > bestMeetingDirectionBalance.qualityScore)
+        meetsRequirements(candidate, minIntersections, minIntersectingWords, maxDirectionSpread) &&
+        (!bestMeetingRequirements || candidate.qualityScore > bestMeetingRequirements.qualityScore)
       ) {
-        bestMeetingDirectionBalance = candidate;
+        bestMeetingRequirements = candidate;
       }
     }
   }
 
   // Un mínimo eleva la calidad, pero nunca impide entregar una sopa válida.
-  const selected = bestMeetingDirectionBalance ?? bestMeetingMinimum ?? best;
+  const selected = bestMeetingRequirements ?? best;
   if (!selected) throw new Error('Unable to generate puzzle');
-  const { grid, words: placed, intersections, directionUsage, qualityScore: selectedQuality } = selected;
+  const { grid, words: placed, intersections, intersectingWords, directionUsage, qualityScore: selectedQuality } = selected;
 
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) {
@@ -132,7 +135,7 @@ export function generatePuzzle(options: PuzzleOptions): Puzzle {
     size,
     grid,
     words: placed,
-    stats: { intersections, directionUsage, qualityScore: selectedQuality },
+    stats: { intersections, intersectingWords, directionUsage, qualityScore: selectedQuality },
   };
   if (!validatePuzzle(puzzle)) {
     throw new Error('Unable to generate puzzle');
@@ -184,6 +187,7 @@ function emptyDirectionUsage(): DirectionUsage {
 
 function qualityScore(
   intersections: number,
+  intersectingWords: number,
   usage: DirectionUsage,
   directions: Direction[],
   directionBalance: number,
@@ -191,11 +195,48 @@ function qualityScore(
   const enabledUsage = directions.map((direction) => usage[direction]);
   const activeDirections = enabledUsage.filter((count) => count > 0).length;
   const spread = Math.max(...enabledUsage) - Math.min(...enabledUsage);
-  return intersections * 100 + directionBalance * (activeDirections * 30 - spread * 8);
+  return intersections * 100 + intersectingWords * 40 + directionBalance * (activeDirections * 30 - spread * 8);
 }
 
-function usesEveryDirection(usage: DirectionUsage, directions: Direction[]): boolean {
-  return directions.every((direction) => usage[direction] > 0);
+function meetsRequirements(
+  candidate: PuzzleCandidate,
+  minIntersections: number,
+  minIntersectingWords: number,
+  maxDirectionSpread: number,
+): boolean {
+  return (
+    candidate.intersections >= minIntersections &&
+    candidate.intersectingWords >= minIntersectingWords &&
+    directionSpread(candidate.directionUsage) <= maxDirectionSpread
+  );
+}
+
+function directionSpread(usage: DirectionUsage): number {
+  const values = Object.values(usage);
+  return Math.max(...values) - Math.min(...values);
+}
+
+function measureIntersections(words: PlacedWord[]): { intersections: number; intersectingWords: number } {
+  const cellOwners = new Map<string, number[]>();
+  for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
+    const word = words[wordIndex];
+    const delta = DIRECTION_DELTAS[word.direction];
+    for (let step = 0; step < word.word.length; step++) {
+      const key = `${word.start.row + delta.row * step},${word.start.col + delta.col * step}`;
+      const owners = cellOwners.get(key) ?? [];
+      owners.push(wordIndex);
+      cellOwners.set(key, owners);
+    }
+  }
+
+  let intersections = 0;
+  const participants = new Set<number>();
+  for (const owners of cellOwners.values()) {
+    if (owners.length < 2) continue;
+    intersections += owners.length - 1;
+    owners.forEach((owner) => participants.add(owner));
+  }
+  return { intersections, intersectingWords: participants.size };
 }
 
 function clamp(value: number, min: number, max: number): number {
