@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
-import { level1 } from '../../data/level1';
 import { generatePuzzle } from '../../core/puzzle/generator';
 import { matchSelection } from '../../core/puzzle/selection';
-import type { PlacedWord, Puzzle } from '../../core/puzzle/types';
+import { levelSystem } from '../../core/progression/levelProgression';
+import type { LevelDefinition, PlacedWord, Puzzle } from '../../core/puzzle/types';
 import { FILLS, FONT, INK, LAYOUT } from '../config';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
+import { GameSession } from '../session/GameSession';
+import { runProgress } from '../session/RunProgress';
 
 interface Pill {
   container: Phaser.GameObjects.Container;
@@ -15,9 +17,15 @@ interface Pill {
   h: number;
 }
 
+export interface GameSceneData {
+  levelId: number;
+}
+
 const DPR = window.devicePixelRatio || 1;
 
 export class GameScene extends Phaser.Scene {
+  private level!: LevelDefinition;
+  private session!: GameSession;
   private puzzle!: Puzzle;
   private tiles: LetterTile[][] = [];
   private boardX = 0;
@@ -31,8 +39,6 @@ export class GameScene extends Phaser.Scene {
 
   private pointerDown = false;
   private isComplete = false;
-  private replayButton: Phaser.GameObjects.Container | null = null;
-  private overlay: Phaser.GameObjects.Container | null = null;
   private debugTouch = false;
   private debugTouchOverlay: TouchDebugOverlay | null = null;
 
@@ -45,11 +51,10 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create(): void {
+  create(data: GameSceneData): void {
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
-    this.input.on('gameobjectup', this.onObjectUp, this);
 
     this.scale.on('resize', this.recenter, this);
 
@@ -68,7 +73,7 @@ export class GameScene extends Phaser.Scene {
 
     this.debugTouch = new URLSearchParams(window.location.search).has('debugTouch');
 
-    this.loadLevel();
+    this.loadLevel(data.levelId);
   }
 
   private destroyInputBoundsSync(): void {
@@ -83,20 +88,23 @@ export class GameScene extends Phaser.Scene {
     if (this.debugTouch) this.debugTouchOverlay = new TouchDebugOverlay(this);
   }
 
-  private loadLevel(): void {
+  private loadLevel(levelId: number): void {
+    const level = levelSystem.get(levelId);
+    if (!level) throw new Error(`Unknown level ${levelId}`);
+    this.level = level;
     this.puzzle = generatePuzzle({
-      size: level1.size,
-      words: level1.words,
-      directions: level1.directions,
-      seed: level1.seed,
+      size: level.size,
+      words: level.words,
+      directions: level.directions,
+      seed: level.seed,
     });
 
     this.isComplete = false;
     this.pointerDown = false;
     this.foundWords.clear();
-    this.selection = new WordSelection([], level1.directions, 0, 0);
-    this.replayButton = null;
-    this.overlay = null;
+    this.selection = new WordSelection([], level.directions, 0, 0);
+    this.session = new GameSession(level);
+    this.session.start();
 
     this.buildBoard();
     this.ensureDebugOverlay();
@@ -125,7 +133,7 @@ export class GameScene extends Phaser.Scene {
     this.boardY = layout.boardY;
 
     this.headerText = this.add
-      .text(this.scale.width / 2, 28, `NIVEL ${level1.id} 🌱`, {
+      .text(this.scale.width / 2, 28, `NIVEL ${this.level.id} 🌱`, {
         fontFamily: FONT,
         fontSize: '30px',
         color: INK.dark,
@@ -157,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const maxSteps = Math.max(...this.puzzle.words.map((placed) => placed.word.length)) - 1;
-    this.selection = new WordSelection(this.tiles, level1.directions, this.cell, maxSteps);
+    this.selection = new WordSelection(this.tiles, this.level.directions, this.cell, maxSteps);
 
     this.feedbackPanel = this.add.graphics().setDepth(95).setAlpha(0);
     this.feedbackText = this.add
@@ -264,7 +272,6 @@ export class GameScene extends Phaser.Scene {
       this.feedbackText.setPosition(cx, cy);
     }
 
-    this.overlay?.setPosition(this.scale.width / 2, this.scale.height / 2);
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
@@ -294,12 +301,6 @@ export class GameScene extends Phaser.Scene {
     return Math.abs(worldX - tile.x) <= half && Math.abs(worldY - tile.y) <= half ? tile : null;
   }
 
-  private onObjectUp(_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject): void {
-    if (gameObject === this.replayButton && this.replayButton !== null && this.replayButton.active) {
-      this.loadLevel();
-    }
-  }
-
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
     if (!this.pointerDown || !this.selection.isActive() || this.isComplete) return;
 
@@ -317,6 +318,8 @@ export class GameScene extends Phaser.Scene {
     if (placed) {
       this.onWordFound(placed);
     } else {
+      // Un toque breve no es un error: solo cuenta una selección de dos o más letras.
+      if (this.selection.length > 1) this.session.registerError();
       for (const tile of this.selection.tiles) tile.shake();
     }
     this.selection.clear();
@@ -329,6 +332,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.foundWords.add(placed.word);
+    this.session.wordFound(placed.word);
     this.markPillFound(placed.word);
     this.showFeedback(placed.word);
 
@@ -380,82 +384,8 @@ export class GameScene extends Phaser.Scene {
   private completeLevel(): void {
     this.isComplete = true;
     this.selection.clear();
-
-    const cx = this.scale.width / 2;
-    const cy = this.scale.height / 2;
-    const overlay = this.add.container(cx, cy).setDepth(199);
-    this.overlay = overlay;
-
-    const panel = this.add.graphics();
-    panel.fillStyle(FILLS.panel, 0.96);
-    panel.fillRoundedRect(-240, -130, 480, 260, 28);
-    panel.lineStyle(4, FILLS.panelBorder, 1);
-    panel.strokeRoundedRect(-240, -130, 480, 260, 28);
-    overlay.add(panel);
-
-    const title = this.add
-      .text(0, -64, '¡NIVEL COMPLETADO!', {
-        fontFamily: FONT,
-        fontSize: '36px',
-        color: INK.dark,
-        fontStyle: 'bold',
-        resolution: DPR,
-      })
-      .setOrigin(0.5)
-      .setScale(0)
-      .setAlpha(0)
-      .setDepth(1);
-    overlay.add(title);
-
-    const sub = this.add
-      .text(0, -4, '🎉 ¡GENIAL! Encontraste todas las palabras', {
-        fontFamily: FONT,
-        fontSize: '22px',
-        color: INK.body,
-        resolution: DPR,
-      })
-      .setOrigin(0.5)
-      .setDepth(1);
-    overlay.add(sub);
-
-    const button = this.buildButton();
-    button.setPosition(0, 58);
-    overlay.add(button);
-
-    this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 280, ease: 'Back.easeOut' });
-  }
-
-  private buildButton(): Phaser.GameObjects.Container {
-    const label = this.add
-      .text(0, 0, 'CONTINUAR', {
-        fontFamily: FONT,
-        fontSize: '26px',
-        color: '#ffffff',
-        fontStyle: 'bold',
-        resolution: DPR,
-      })
-      .setOrigin(0.5);
-    const padX = 30;
-    const padY = 12;
-    const w = label.width + padX * 2;
-    const h = label.height + padY * 2;
-
-    const rect = this.add.graphics();
-    rect.fillStyle(FILLS.button, 1);
-    rect.fillRoundedRect(-w / 2, -h / 2, w, h, 20);
-
-    const container = this.add.container(0, 0);
-    container.add(rect);
-    container.add(label);
-    container.setSize(w, h);
-    container.setInteractive(
-      new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
-      Phaser.Geom.Rectangle.Contains,
-    );
-    container.on('pointerover', () => container.setScale(1.07));
-    container.on('pointerout', () => container.setScale(1));
-    container.on('pointerdown', () => container.setScale(0.95));
-    this.replayButton = container;
-    return container;
+    const result = this.session.complete();
+    const totalScore = runProgress.add(result.score);
+    this.scene.start('Result', { result, totalScore });
   }
 }
