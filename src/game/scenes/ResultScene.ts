@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { levelSystem } from '../../core/progression/levelProgression';
 import { FILLS, FONT, INK } from '../config';
 import { getLayoutMetrics } from '../layout/ResponsiveLayout';
-import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import type { GameSessionResult } from '../session/GameSession';
 
 export interface ResultSceneData {
@@ -71,7 +71,7 @@ export class ResultScene extends Phaser.Scene {
 
     this.addStars(cx, top + (isFinal ? 145 : 128), result.stars, compact);
     const scoreY = top + (isFinal ? 205 : 185);
-    const scoreText = this.addText(cx, scoreY, `🏆 ${result.score.toLocaleString('es-MX')} puntos`, compact ? 24 : 28, INK.dark, true);
+    const scoreText = this.addText(cx, scoreY, `🏆 ${result.score.toLocaleString('es-MX')} puntos`, compact ? 24 : 28, INK.dark, true, true);
     const statTexts: Array<{ label: Phaser.GameObjects.Text; value: Phaser.GameObjects.Text }> = [];
 
     if (!isFinal) {
@@ -80,7 +80,7 @@ export class ResultScene extends Phaser.Scene {
       statTexts.push(this.addStat(cx, panelW, scoreY + 108, 'Errores', `${result.errors}`, compact));
     }
     const totalY = scoreY + (isFinal ? 62 : 150);
-    const totalText = this.addText(cx, totalY, `TOTAL DE LA PARTIDA\n${totalScore.toLocaleString('es-MX')} PTS`, compact ? 16 : 18, INK.dark, true);
+    const totalText = this.addText(cx, totalY, `TOTAL DE LA PARTIDA\n${totalScore.toLocaleString('es-MX')} PTS`, compact ? 16 : 18, INK.dark, true, true);
     if (!isFinal) {
       this.addButton(cx, totalY + 58, 'SIGUIENTE NIVEL ▶', () => {
         this.scene.start('Game', { levelId: levelSystem.next(result.levelId)!.id });
@@ -109,8 +109,8 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
-  private addText(x: number, y: number, text: string, size: number, color: string, bold = false): Phaser.GameObjects.Text {
-    return this.add.text(x, y, text, {
+  private addText(x: number, y: number, text: string, size: number, color: string, bold = false, runTextTest = false): Phaser.GameObjects.Text {
+    const label = this.add.text(x, y, text, {
       fontFamily: FONT,
       fontSize: `${size}px`,
       color,
@@ -118,6 +118,8 @@ export class ResultScene extends Phaser.Scene {
       align: 'center',
       resolution: DPR,
     }).setOrigin(0.5);
+    if (runTextTest) applyLayoutTextTest(label);
+    return label;
   }
 
   private addStat(cx: number, panelW: number, y: number, label: string, value: string, compact: boolean): { label: Phaser.GameObjects.Text; value: Phaser.GameObjects.Text } {
@@ -125,6 +127,8 @@ export class ResultScene extends Phaser.Scene {
     const size = compact ? 18 : 20;
     const labelText = this.add.text(cx - panelW / 2 + inset, y, label, { fontFamily: FONT, fontSize: `${size}px`, color: INK.body, resolution: DPR }).setOrigin(0, 0.5);
     const valueText = this.add.text(cx + panelW / 2 - inset, y, value, { fontFamily: FONT, fontSize: `${size}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(1, 0.5);
+    applyLayoutTextTest(labelText);
+    applyLayoutTextTest(valueText);
     return { label: labelText, value: valueText };
   }
 

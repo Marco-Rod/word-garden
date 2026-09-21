@@ -8,7 +8,7 @@ import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
 import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
-import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
@@ -185,6 +185,7 @@ export class GameScene extends Phaser.Scene {
         resolution: DPR,
       })
       .setOrigin(0.5);
+    applyLayoutTextTest(this.headerText);
 
     this.buildPills();
 
@@ -269,6 +270,7 @@ export class GameScene extends Phaser.Scene {
         resolution: DPR,
       })
       .setOrigin(0.5);
+    applyLayoutTextTest(this.wordCounter);
 
     this.recenterPills();
   }

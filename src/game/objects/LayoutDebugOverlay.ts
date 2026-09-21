@@ -94,3 +94,22 @@ export class LayoutDebugOverlay {
 }
 
 export const isLayoutDebugEnabled = (): boolean => new URLSearchParams(window.location.search).has('debugLayout');
+
+type TextTest = 'padding' | 'system' | null;
+
+const getTextTest = (): TextTest => {
+  const value = new URLSearchParams(window.location.search).get('textTest');
+  return value === 'padding' || value === 'system' ? value : null;
+};
+
+/** Applies an A/B rendering experiment only to the explicitly tracked texts. */
+export const applyLayoutTextTest = (text: Phaser.GameObjects.Text): void => {
+  switch (getTextTest()) {
+    case 'padding':
+      text.setPadding(2, 4, 2, 6);
+      break;
+    case 'system':
+      text.setFontFamily('Arial, sans-serif');
+      break;
+  }
+};

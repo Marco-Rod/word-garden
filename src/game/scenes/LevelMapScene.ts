@@ -4,7 +4,7 @@ import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelProgress } from '../../core/progression/ProgressRepository';
 import { FILLS, FONT, INK } from '../config';
 import { MapEnvironment } from '../objects/MapEnvironment';
-import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
+import { applyLayoutTextTest, isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 
 const DPR = window.devicePixelRatio || 1;
 const DESKTOP_MAP_HEIGHT = 1_470;
@@ -106,6 +106,7 @@ export class LevelMapScene extends Phaser.Scene {
     header.strokeRoundedRect(16, 10, width - 32, headerH, compact ? 18 : 22);
     this.addText(width / 2, titleY, '🌱 WORD GARDEN', compact ? 24 : 27, INK.dark, true).setDepth(51);
     this.totalStarsText = this.addText(width / 2, starsY, `⭐ ${totalStars} / ${levelSystem.all().length * 3}`, compact ? 17 : 18, INK.body, true).setDepth(51);
+    applyLayoutTextTest(this.totalStarsText);
     this.addText(width / 2, this.scale.height - 20, 'DESLIZA PARA EXPLORAR', 14, INK.dark, true).setDepth(51).setAlpha(0.75);
   }
 
