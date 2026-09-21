@@ -64,7 +64,7 @@ export class GameScene extends Phaser.Scene {
     const requestedLevel = levelSystem.get(data.levelId);
     if (!requestedLevel) throw new Error(`Unknown level ${data.levelId}`);
     if (!progressSystem.isUnlocked(data.levelId)) {
-      this.scene.start('LevelSelect');
+      this.scene.start('LevelMap');
       return;
     }
     if (requestedLevel.tutorial && !data.tutorialAcknowledged) {

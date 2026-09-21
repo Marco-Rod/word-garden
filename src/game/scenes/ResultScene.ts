@@ -79,7 +79,7 @@ export class ResultScene extends Phaser.Scene {
         this.scene.start('Game', { levelId: levelSystem.next(result.levelId)!.id });
       });
     }
-    this.addButton(cx, totalY + (isFinal ? 164 : 148), 'NIVELES', () => this.scene.start('LevelSelect'), true);
+    this.addButton(cx, totalY + (isFinal ? 164 : 148), 'MAPA', () => this.scene.start('LevelMap'), true);
   }
 
   private addStars(x: number, y: number, earned: number): void {
