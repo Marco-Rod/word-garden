@@ -24,4 +24,12 @@ describe('LevelSystem', () => {
       expect(puzzle.words).toHaveLength(level.words.length);
     }
   });
+
+  it('introduces intersections across the official mid-game levels', () => {
+    const intersections = system.all()
+      .filter((candidate) => candidate.id >= 5)
+      .map((level) => generatePuzzle(level).stats.intersections);
+    expect(intersections.some((count) => count > 0)).toBe(true);
+    expect(intersections[intersections.length - 1]).toBeGreaterThan(0);
+  });
 });

@@ -23,6 +23,7 @@ export class LetterTile extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Graphics;
   private readonly label: Phaser.GameObjects.Text;
   private tileState: TileState = 'idle';
+  private foundColors: { fill: number; stroke: number } | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -68,6 +69,12 @@ export class LetterTile extends Phaser.GameObjects.Container {
     return this.tileState;
   }
 
+  setFoundColor(fill: number, stroke: number): void {
+    this.foundColors = { fill, stroke };
+    this.tileState = 'found';
+    this.redraw('found');
+  }
+
   pop(): void {
     this.setScale(1);
     this.scene.tweens.add({ targets: this, scale: 1.3, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
@@ -91,9 +98,11 @@ export class LetterTile extends Phaser.GameObjects.Container {
     const h = this.height;
     const radius = Math.round(Math.min(w, h) * 0.18);
     this.bg.clear();
-    this.bg.fillStyle(STATE_FILLS[state], 1);
+    const fill = state === 'found' && this.foundColors ? this.foundColors.fill : STATE_FILLS[state];
+    const stroke = state === 'found' && this.foundColors ? this.foundColors.stroke : STATE_STROKES[state];
+    this.bg.fillStyle(fill, 1);
     this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, radius);
-    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * 0.05)), STATE_STROKES[state], 1);
+    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * 0.05)), stroke, 1);
     this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
   }
 }

@@ -3,7 +3,7 @@ import { generatePuzzle } from '../../core/puzzle/generator';
 import { matchSelection } from '../../core/puzzle/selection';
 import { levelSystem } from '../../core/progression/levelProgression';
 import type { LevelDefinition, PlacedWord, Puzzle } from '../../core/puzzle/types';
-import { FILLS, FONT, INK, LAYOUT } from '../config';
+import { FILLS, FONT, INK, LAYOUT, WORD_FOUND_COLORS } from '../config';
 import { LetterTile } from '../objects/LetterTile';
 import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { WordSelection } from '../objects/WordSelection';
@@ -13,6 +13,7 @@ import { runProgress } from '../session/RunProgress';
 interface Pill {
   container: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
+  rect: Phaser.GameObjects.Graphics;
   w: number;
   h: number;
 }
@@ -36,6 +37,9 @@ export class GameScene extends Phaser.Scene {
   private selection!: WordSelection;
   private pillsByWord = new Map<string, Pill>();
   private pillsOrder: Pill[] = [];
+  private wordColors = new Map<string, (typeof WORD_FOUND_COLORS)[number]>();
+  private wordCounter: Phaser.GameObjects.Text | null = null;
+  private wordAreaH = LAYOUT.headerH;
 
   private pointerDown = false;
   private isComplete = false;
@@ -96,6 +100,7 @@ export class GameScene extends Phaser.Scene {
       size: level.size,
       words: level.words,
       directions: level.directions,
+      intersectionPreference: level.intersectionPreference,
       seed: level.seed,
     });
 
@@ -112,13 +117,14 @@ export class GameScene extends Phaser.Scene {
 
   private computeLayout(): { cell: number; boardX: number; boardY: number } {
     const availW = this.scale.width - LAYOUT.margin * 2;
-    const availH = this.scale.height - LAYOUT.headerH - LAYOUT.bottomH;
-    const cell = Phaser.Math.Clamp(Math.floor(Math.min(availW / this.puzzle.size, availH / this.puzzle.size)), 44, 100);
+    this.wordAreaH = this.wordListLayout().areaH;
+    const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
+    const cell = Phaser.Math.Clamp(Math.floor(Math.min(availW / this.puzzle.size, availH / this.puzzle.size)), 36, 100);
     const boardPx = cell * this.puzzle.size;
     return {
       cell,
       boardX: Math.floor((this.scale.width - boardPx) / 2),
-      boardY: Math.floor(LAYOUT.headerH - 8 + (availH - boardPx) / 2),
+      boardY: Math.floor(this.wordAreaH - 8 + (availH - boardPx) / 2),
     };
   }
 
@@ -126,6 +132,9 @@ export class GameScene extends Phaser.Scene {
     this.children.removeAll(true);
     this.pillsByWord.clear();
     this.pillsOrder = [];
+    this.wordColors = new Map(
+      this.puzzle.words.map((placed, index) => [placed.word, WORD_FOUND_COLORS[index % WORD_FOUND_COLORS.length]]),
+    );
 
     const layout = this.computeLayout();
     this.cell = layout.cell;
@@ -182,54 +191,94 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildPills(): void {
-    const padX = 16;
-    const padY = 9;
+    const layout = this.wordListLayout();
+    const padY = 7;
 
     this.pillsOrder = this.puzzle.words.map((placed) => {
       const label = this.add.text(0, 0, placed.word, {
         fontFamily: FONT,
-        fontSize: '24px',
+        fontSize: `${layout.fontSize}px`,
         color: INK.body,
         fontStyle: 'bold',
         resolution: DPR,
       });
-      const w = label.width + padX * 2;
+      const w = layout.columnW;
       const h = label.height + padY * 2;
       const container = this.add.container(0, 0);
       const rect = this.add.graphics();
+      rect.fillStyle(FILLS.panel, 0.88);
+      rect.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
+      rect.lineStyle(2, FILLS.panelBorder, 0.8);
+      rect.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
       container.add(rect);
       label.setOrigin(0.5);
       container.add(label);
       container.setSize(w, h);
-      this.pillsByWord.set(placed.word, { container, label, w, h });
-      return { container, label, w, h };
+      const pill = { container, label, rect, w, h };
+      this.pillsByWord.set(placed.word, pill);
+      return pill;
     });
+
+    this.wordCounter = this.add
+      .text(this.scale.width / 2, 28, `0 / ${this.puzzle.words.length} palabras`, {
+        fontFamily: FONT,
+        fontSize: '18px',
+        color: INK.body,
+        fontStyle: 'bold',
+        resolution: DPR,
+      })
+      .setOrigin(0.5);
 
     this.recenterPills();
   }
 
   private recenterPills(): void {
-    const gap = 12;
-    const totalW = this.pillsOrder.reduce((sum, pill) => sum + pill.w, 0) + gap * (this.pillsOrder.length - 1);
-    let cursorX = this.scale.width / 2 - totalW / 2;
-    for (const pill of this.pillsOrder) {
-      pill.container.setPosition(cursorX + pill.w / 2, LAYOUT.headerH - 22);
-      cursorX += pill.w + gap;
+    const layout = this.wordListLayout();
+    const startX = (this.scale.width - (layout.columns * layout.columnW + (layout.columns - 1) * layout.gap)) / 2;
+    for (let index = 0; index < this.pillsOrder.length; index++) {
+      const pill = this.pillsOrder[index];
+      const row = Math.floor(index / layout.columns);
+      const col = index % layout.columns;
+      pill.container.setPosition(
+        startX + col * (layout.columnW + layout.gap) + layout.columnW / 2,
+        57 + row * (pill.h + layout.gap) + pill.h / 2,
+      );
     }
+    this.wordCounter?.setPosition(this.scale.width / 2, 28);
+  }
+
+  private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
+    const gap = 8;
+    const fontSize = this.scale.width < 400 ? 18 : 21;
+    const availableW = this.scale.width - LAYOUT.margin * 2;
+    const longestWord = Math.max(...this.puzzle.words.map((placed) => placed.word.length));
+    const minPillW = Math.ceil(longestWord * fontSize * 0.64 + 20);
+    let columns = Math.min(3, this.puzzle.words.length);
+    while (columns > 1 && (availableW - gap * (columns - 1)) / columns < minPillW) columns--;
+    const columnW = Math.floor((availableW - gap * (columns - 1)) / columns);
+    const rowH = fontSize + 14;
+    const rows = Math.ceil(this.puzzle.words.length / columns);
+    return { columns, columnW, gap, fontSize, areaH: 57 + rows * rowH + Math.max(0, rows - 1) * gap + 10 };
   }
 
   private markPillFound(word: string): void {
     const pill = this.pillsByWord.get(word);
     if (!pill) return;
-    pill.label.setColor(INK.muted);
+    const color = this.wordColors.get(word) ?? WORD_FOUND_COLORS[0];
+    pill.rect.clear();
+    pill.rect.fillStyle(color.fill, 0.88);
+    pill.rect.fillRoundedRect(-pill.w / 2, -pill.h / 2, pill.w, pill.h, 14);
+    pill.rect.lineStyle(2, color.stroke, 1);
+    pill.rect.strokeRoundedRect(-pill.w / 2, -pill.h / 2, pill.w, pill.h, 14);
+    pill.label.setColor(INK.dark);
     const line = this.add
-      .rectangle(pill.label.x, pill.label.y + 3, pill.label.width + 10, 3, FILLS.strikethrough, 1)
+      .rectangle(pill.label.x, pill.label.y + 3, pill.label.width + 10, 3, color.stroke, 1)
       .setDepth(5);
     const check = this.add
       .text(pill.label.x - pill.label.width / 2 - 14, pill.label.y, '✓', {
         fontFamily: FONT,
         fontSize: '24px',
-        color: '#2e7d32',
+        color: `#${color.stroke.toString(16).padStart(6, '0')}`,
         fontStyle: 'bold',
         resolution: DPR,
       })
@@ -248,10 +297,11 @@ export class GameScene extends Phaser.Scene {
 
   private recenter(): void {
     if (!this.puzzle) return;
-    const availH = this.scale.height - LAYOUT.headerH - LAYOUT.bottomH;
+    this.wordAreaH = this.wordListLayout().areaH;
+    const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
     const boardPx = this.cell * this.puzzle.size;
     this.boardX = Math.floor((this.scale.width - boardPx) / 2);
-    this.boardY = Math.floor(LAYOUT.headerH - 8 + (availH - boardPx) / 2);
+    this.boardY = Math.floor(this.wordAreaH - 8 + (availH - boardPx) / 2);
 
     for (let row = 0; row < this.tiles.length; row++) {
       for (let col = 0; col < this.tiles[row].length; col++) {
@@ -326,13 +376,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onWordFound(placed: PlacedWord): void {
+    const color = this.wordColors.get(placed.word) ?? WORD_FOUND_COLORS[0];
     for (const tile of this.selection.tiles) {
-      tile.setTileState('found');
+      tile.setFoundColor(color.fill, color.stroke);
       tile.pop();
     }
 
     this.foundWords.add(placed.word);
     this.session.wordFound(placed.word);
+    this.wordCounter?.setText(`${this.foundWords.size} / ${this.puzzle.words.length} palabras`);
     this.markPillFound(placed.word);
     this.showFeedback(placed.word);
 

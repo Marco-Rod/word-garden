@@ -22,12 +22,16 @@ export interface Puzzle {
   size: number;
   grid: string[][];
   words: PlacedWord[];
+  stats: {
+    intersections: number;
+  };
 }
 
 export interface PuzzleOptions {
   size: number;
   words: string[];
   directions?: Direction[];
+  intersectionPreference?: number;
   seed: number;
 }
 
@@ -36,5 +40,6 @@ export interface LevelDefinition {
   size: number;
   words: string[];
   directions: Direction[];
+  intersectionPreference: number;
   seed: number;
 }

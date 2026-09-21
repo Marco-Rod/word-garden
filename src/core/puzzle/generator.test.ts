@@ -52,6 +52,21 @@ describe('generatePuzzle', () => {
     expect(a.words.map((w) => `${w.word}@${w.start.row},${w.start.col}:${w.direction}`)).toEqual(
       b.words.map((w) => `${w.word}@${w.start.row},${w.start.col}:${w.direction}`),
     );
+    expect(a.stats).toEqual(b.stats);
+  });
+
+  it('records same-letter intersections without allowing conflicting collisions', () => {
+    const puzzles = Array.from({ length: 30 }, (_, index) =>
+      generatePuzzle({
+        size: 5,
+        words: ['GATO', 'OSO'],
+        directions: ['RIGHT', 'DOWN'],
+        intersectionPreference: 1,
+        seed: index + 1,
+      }),
+    );
+    expect(puzzles.some((puzzle) => puzzle.stats.intersections > 0)).toBe(true);
+    expect(puzzles.every(validatePuzzle)).toBe(true);
   });
 
   it('normalizes words to uppercase', () => {

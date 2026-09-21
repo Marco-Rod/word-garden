@@ -16,6 +16,15 @@ export const FILLS = {
   strikethrough: 0x2e7d32,
 };
 
+export const WORD_FOUND_COLORS = [
+  { fill: 0xa5d6a7, stroke: 0x2e7d32 },
+  { fill: 0xffcc80, stroke: 0xef6c00 },
+  { fill: 0x90caf9, stroke: 0x1565c0 },
+  { fill: 0xce93d8, stroke: 0x7b1fa2 },
+  { fill: 0xffab91, stroke: 0xd84315 },
+  { fill: 0x80deea, stroke: 0x00838f },
+] as const;
+
 export const INK = {
   dark: '#1b4f72',
   body: '#5d4037',

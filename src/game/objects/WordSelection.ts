@@ -36,9 +36,10 @@ export class WordSelection {
 
   startAt(tile: LetterTile): void {
     this.clear();
-    if (tile.getTileState() === 'found') return;
     this.origin = tile;
-    tile.setTileState('selected');
+    // Una letra encontrada puede pertenecer a otra palabra cruzada. La
+    // conservamos verde, pero permitimos iniciar una selección desde ella.
+    if (tile.getTileState() !== 'found') tile.setTileState('selected');
     this.selected.push(tile);
   }
 
@@ -60,7 +61,7 @@ export class WordSelection {
     let projection = projectGesture(dir, dRow, dCol);
     if (projection.perp / this.cellSize > this.toleranceCells) return;
 
-    let steps = this.clampByFoundAndEdges(
+    let steps = this.clampByEdges(
       origin,
       dir,
       cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
@@ -73,7 +74,7 @@ export class WordSelection {
         dir = alt;
         projection = projectGesture(alt, dRow, dCol);
         if (projection.perp / this.cellSize <= this.toleranceCells) {
-          steps = this.clampByFoundAndEdges(
+          steps = this.clampByEdges(
             origin,
             dir,
             cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
@@ -94,12 +95,14 @@ export class WordSelection {
     this.locked = null;
   }
 
-  private clampByFoundAndEdges(origin: LetterTile, dir: Direction, steps: number): number {
+  private clampByEdges(origin: LetterTile, dir: Direction, steps: number): number {
     const delta = DIRECTION_DELTAS[dir];
     let cap = steps;
     for (let k = 1; k <= steps; k++) {
       const tile = this.grid[origin.row + delta.row * k]?.[origin.col + delta.col * k];
-      if (!tile || tile.getTileState() === 'found') {
+      // Las letras encontradas son transitables: pueden ser el cruce de una
+      // palabra pendiente. Solo el borde limita el arrastre.
+      if (!tile) {
         cap = Math.min(cap, k - 1);
         break;
       }

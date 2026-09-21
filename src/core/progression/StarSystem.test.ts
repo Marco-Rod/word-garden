@@ -6,16 +6,17 @@ describe('calculateStars', () => {
     expect(calculateStars({ completed: false, errors: 0, efficiency: 1 })).toBe(0);
   });
 
-  it('rewards completion even when there are many errors', () => {
+  it('awards one star with two or more errors', () => {
+    expect(calculateStars({ completed: true, errors: 2, efficiency: 1 })).toBe(1);
     expect(calculateStars({ completed: true, errors: 3, efficiency: 1 })).toBe(1);
+    expect(calculateStars({ completed: true, errors: 10, efficiency: 1 })).toBe(1);
   });
 
-  it('awards two stars with up to two errors', () => {
-    expect(calculateStars({ completed: true, errors: 2, efficiency: 0 })).toBe(2);
+  it('awards two stars with one error', () => {
+    expect(calculateStars({ completed: true, errors: 1, efficiency: 0 })).toBe(2);
   });
 
-  it('requires a perfect and efficient game for three stars', () => {
-    expect(calculateStars({ completed: true, errors: 0, efficiency: 0.69 })).toBe(2);
-    expect(calculateStars({ completed: true, errors: 0, efficiency: 0.7 })).toBe(3);
+  it('awards three stars for a perfect game regardless of time', () => {
+    expect(calculateStars({ completed: true, errors: 0, efficiency: 0 })).toBe(3);
   });
 });
