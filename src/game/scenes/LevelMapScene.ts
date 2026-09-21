@@ -3,6 +3,7 @@ import { levelSystem } from '../../core/progression/levelProgression';
 import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelProgress } from '../../core/progression/ProgressRepository';
 import { FILLS, FONT, INK } from '../config';
+import { MapEnvironment } from '../objects/MapEnvironment';
 
 const DPR = window.devicePixelRatio || 1;
 const MAP_HEIGHT = 1_470;
@@ -44,14 +45,22 @@ export class LevelMapScene extends Phaser.Scene {
     const highest = Math.min(progress.highestUnlockedLevel, levelSystem.all().length);
     if (centerOnProgress) this.mapOffset = this.offsetNearLevel(highest);
 
-    this.drawBackground();
+    this.drawWaterBase();
     this.map = this.add.container(0, this.mapOffset);
     const positions = levelSystem.all().map((level, index) => ({
       level,
       x: this.pathX(index),
       y: MAP_HEIGHT - 150 - index * NODE_SPACING,
     }));
-    this.drawPath(positions.map(({ x, y }) => ({ x, y })));
+    const path = positions.map(({ x, y }) => ({ x, y }));
+    new MapEnvironment(this, this.map, {
+      seed: 'world-1',
+      width,
+      height: MAP_HEIGHT,
+      path,
+      nodeZones: positions.map(({ level, x, y }) => ({ x, y, radius: level.id === 10 ? 53 : 40 })),
+    }).draw();
+    this.drawPath(path);
     for (const { level, x, y } of positions) {
       const unlocked = progressSystem.isUnlocked(level.id);
       const record = progress.levels[level.id];
@@ -62,19 +71,10 @@ export class LevelMapScene extends Phaser.Scene {
     this.drawHeader(width, progressSystem.totalStars());
   }
 
-  private drawBackground(): void {
+  private drawWaterBase(): void {
     const background = this.add.graphics();
     background.fillStyle(0x8fd3ff, 1);
     background.fillRect(0, 0, this.scale.width, this.scale.height);
-    const lawnColors = [0xdcedc8, 0xc5e1a5, 0xd4eeb5];
-    for (let y = 120, index = 0; y < this.scale.height + 120; y += 155, index++) {
-      const color = lawnColors[index % lawnColors.length];
-      background.fillStyle(color, 0.9);
-      background.fillEllipse(this.scale.width * 0.2, y, this.scale.width * 0.95, 126);
-      background.fillEllipse(this.scale.width * 0.78, y + 18, this.scale.width * 0.86, 116);
-      background.fillStyle(0x9ccc65, 0.18);
-      background.fillEllipse(this.scale.width * (index % 2 ? 0.18 : 0.82), y - 22, this.scale.width * 0.4, 48);
-    }
   }
 
   private drawHeader(width: number, totalStars: number): void {
@@ -112,9 +112,12 @@ export class LevelMapScene extends Phaser.Scene {
     const drawing = this.add.graphics();
     const completed = !!record?.completed;
     const isChallenge = levelId === 10;
+    let challengeHalo: Phaser.GameObjects.Graphics | null = null;
     if (isChallenge && unlocked) {
-      drawing.fillStyle(0xfff3a3, 0.55);
-      drawing.fillCircle(0, 0, radius + 13);
+      challengeHalo = this.add.graphics();
+      challengeHalo.fillStyle(0xffe082, 0.48);
+      challengeHalo.fillCircle(0, 0, radius + 15);
+      node.add(challengeHalo);
     }
     drawing.fillStyle(completed ? 0x81c784 : unlocked ? 0xffcc80 : 0x90a4ae, unlocked ? 1 : 0.7);
     drawing.fillCircle(0, 0, radius);
@@ -151,6 +154,17 @@ export class LevelMapScene extends Phaser.Scene {
       this.addNodeText(node, 0, 20, `${levelId}`, 21, INK.white, true);
     }
     this.map.add(node);
+    if (challengeHalo && !completed) {
+      this.tweens.add({
+        targets: challengeHalo,
+        scale: 1.12,
+        alpha: 0.18,
+        duration: 1_150,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
   }
 
   private addGardenGrowth(node: Phaser.GameObjects.Container, radius: number, stars: number): void {
