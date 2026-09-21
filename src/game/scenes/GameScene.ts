@@ -63,7 +63,7 @@ export class GameScene extends Phaser.Scene {
     this.isComplete = false;
     this.pointerDown = false;
     this.foundWords.clear();
-    this.selection = new WordSelection([]);
+    this.selection = new WordSelection([], level1.directions, 0, 0);
     this.replayButton = null;
     this.overlay = null;
 
@@ -124,7 +124,8 @@ export class GameScene extends Phaser.Scene {
       this.tiles.push(tileRow);
     }
 
-    this.selection = new WordSelection(this.tiles);
+    const maxSteps = Math.max(...this.puzzle.words.map((placed) => placed.word.length)) - 1;
+    this.selection = new WordSelection(this.tiles, level1.directions, this.cell, maxSteps);
 
     this.feedbackPanel = this.add.graphics().setDepth(95).setAlpha(0);
     this.feedbackText = this.add
@@ -251,25 +252,7 @@ export class GameScene extends Phaser.Scene {
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
     if (!this.pointerDown || !this.selection.isActive() || this.isComplete) return;
 
-    const target = this.toGridCoords(pointer);
-    if (!target) return;
-    const tile = this.tiles[target.row][target.col];
-    if (!tile || tile.getTileState() === 'found') return;
-
-    this.selection.extendTo(tile);
-  }
-
-  private toGridCoords(pointer: Phaser.Input.Pointer): { row: number; col: number } | null {
-    const row = Math.round((pointer.worldY - this.boardY) / this.cell - 0.5);
-    const col = Math.round((pointer.worldX - this.boardX) / this.cell - 0.5);
-    if (row < 0 || row >= this.puzzle.size || col < 0 || col >= this.puzzle.size) return null;
-
-    const centerX = this.boardX + col * this.cell + this.cell / 2;
-    const centerY = this.boardY + row * this.cell + this.cell / 2;
-    if (Math.abs(pointer.worldX - centerX) > this.cell * 0.55) return null;
-    if (Math.abs(pointer.worldY - centerY) > this.cell * 0.55) return null;
-
-    return { row, col };
+    this.selection.moveTo(pointer.worldX, pointer.worldY);
   }
 
   private onPointerUp(_pointer: Phaser.Input.Pointer): void {

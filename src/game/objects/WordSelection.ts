@@ -1,9 +1,22 @@
+import { DIRECTION_DELTAS } from '../../core/puzzle/directions';
+import { bestAllowedDirection, cellPrefixSteps, projectGesture } from '../../core/puzzle/gesture';
+import type { Direction } from '../../core/puzzle/types';
 import type { LetterTile } from './LetterTile';
 
+export const SELECTION_TOLERANCE_CELLS = 0.7;
+
 export class WordSelection {
+  private origin: LetterTile | null = null;
+  private locked: Direction | null = null;
   private selected: LetterTile[] = [];
 
-  constructor(private readonly grid: LetterTile[][]) {}
+  constructor(
+    private readonly grid: LetterTile[][],
+    private readonly allowedDirections: Direction[],
+    private readonly cellSize: number,
+    private readonly maxSteps: number,
+    private readonly toleranceCells = SELECTION_TOLERANCE_CELLS,
+  ) {}
 
   get tiles(): readonly LetterTile[] {
     return this.selected;
@@ -13,8 +26,8 @@ export class WordSelection {
     return this.selected.length;
   }
 
-  get last(): LetterTile | undefined {
-    return this.selected[this.selected.length - 1];
+  get isLocked(): boolean {
+    return this.locked !== null;
   }
 
   isActive(): boolean {
@@ -24,42 +37,52 @@ export class WordSelection {
   startAt(tile: LetterTile): void {
     this.clear();
     if (tile.getTileState() === 'found') return;
+    this.origin = tile;
     tile.setTileState('selected');
     this.selected.push(tile);
   }
 
-  extendTo(target: LetterTile): void {
-    const last = this.selected[this.selected.length - 1];
-    if (!last || target === last) return;
+  moveTo(worldX: number, worldY: number): void {
+    if (!this.origin) return;
+    const origin = this.origin;
 
-    const existing = this.selected.indexOf(target);
-    if (existing !== -1) {
-      this.trimTo(existing);
-      return;
+    const dRow = worldY - origin.y;
+    const dCol = worldX - origin.x;
+
+    let dir = this.locked;
+    if (!dir) {
+      const snapped = bestAllowedDirection(this.allowedDirections, dRow, dCol);
+      if (!snapped) return;
+      this.locked = snapped;
+      dir = snapped;
     }
 
-    let dirRow: number;
-    let dirCol: number;
-    if (this.selected.length >= 2) {
-      const prev = this.selected[this.selected.length - 2];
-      dirRow = last.row - prev.row;
-      dirCol = last.col - prev.col;
-    } else {
-      dirRow = Math.sign(target.row - last.row);
-      dirCol = Math.sign(target.col - last.col);
+    let projection = projectGesture(dir, dRow, dCol);
+    if (projection.perp / this.cellSize > this.toleranceCells) return;
+
+    let steps = this.clampByFoundAndEdges(
+      origin,
+      dir,
+      cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
+    );
+
+    if (steps === 0 && this.locked === dir) {
+      const alt = bestAllowedDirection(this.allowedDirections, dRow, dCol);
+      if (alt && alt !== dir) {
+        this.locked = alt;
+        dir = alt;
+        projection = projectGesture(alt, dRow, dCol);
+        if (projection.perp / this.cellSize <= this.toleranceCells) {
+          steps = this.clampByFoundAndEdges(
+            origin,
+            dir,
+            cellPrefixSteps(projection.t / this.cellSize, this.maxSteps),
+          );
+        }
+      }
     }
 
-    const steps = this.stepsAlongRay(last, target, dirRow, dirCol);
-    if (steps === null) return;
-
-    let current = last;
-    for (let step = 0; step < steps; step++) {
-      const next = this.grid[current.row + dirRow]?.[current.col + dirCol];
-      if (!next || next.getTileState() === 'found') return;
-      next.setTileState('selected');
-      this.selected.push(next);
-      current = next;
-    }
+    this.applyPrefix(origin, dir, steps);
   }
 
   clear(): void {
@@ -67,36 +90,41 @@ export class WordSelection {
       if (tile.getTileState() === 'selected') tile.setTileState('idle');
     }
     this.selected = [];
+    this.origin = null;
+    this.locked = null;
   }
 
-  private stepsAlongRay(
-    from: LetterTile,
-    to: LetterTile,
-    dirRow: number,
-    dirCol: number,
-  ): number | null {
-    if (dirRow === 0 && dirCol === 0) return null;
-
-    let steps: number;
-    if (dirRow !== 0) {
-      const dr = to.row - from.row;
-      if (dr % dirRow !== 0) return null;
-      steps = dr / dirRow;
-      if (to.col !== from.col + steps * dirCol) return null;
-    } else {
-      if (to.row !== from.row) return null;
-      const dc = to.col - from.col;
-      if (dc % dirCol !== 0) return null;
-      steps = dc / dirCol;
+  private clampByFoundAndEdges(origin: LetterTile, dir: Direction, steps: number): number {
+    const delta = DIRECTION_DELTAS[dir];
+    let cap = steps;
+    for (let k = 1; k <= steps; k++) {
+      const tile = this.grid[origin.row + delta.row * k]?.[origin.col + delta.col * k];
+      if (!tile || tile.getTileState() === 'found') {
+        cap = Math.min(cap, k - 1);
+        break;
+      }
     }
-
-    return steps > 0 ? steps : null;
+    return cap;
   }
 
-  private trimTo(index: number): void {
-    const removed = this.selected.splice(index + 1);
-    for (const tile of removed) {
-      if (tile.getTileState() === 'selected') tile.setTileState('idle');
+  private applyPrefix(origin: LetterTile, dir: Direction, steps: number): void {
+    const delta = DIRECTION_DELTAS[dir];
+    const desired: LetterTile[] = [];
+    for (let k = 0; k <= steps; k++) {
+      const tile = this.grid[origin.row + delta.row * k]?.[origin.col + delta.col * k];
+      if (!tile) break;
+      desired.push(tile);
     }
+
+    const old = this.selected;
+    const oldSet = new Set(old);
+    const desiredSet = new Set(desired);
+    for (const tile of old) {
+      if (!desiredSet.has(tile) && tile.getTileState() === 'selected') tile.setTileState('idle');
+    }
+    for (const tile of desired) {
+      if (!oldSet.has(tile) && tile.getTileState() !== 'found') tile.setTileState('selected');
+    }
+    this.selected = desired;
   }
 }
