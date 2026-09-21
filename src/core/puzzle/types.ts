@@ -31,6 +31,7 @@ export interface Puzzle {
 }
 
 export interface PuzzleDifficulty {
+  allowIntersections: boolean;
   intersectionPreference: number;
   minIntersections: number;
   directionBalance: number;
@@ -42,6 +43,7 @@ export interface PuzzleOptions {
   size: number;
   words: string[];
   directions?: Direction[];
+  allowIntersections?: boolean;
   intersectionPreference?: number;
   minIntersections?: number;
   directionBalance?: number;
@@ -56,4 +58,16 @@ export interface LevelDefinition extends PuzzleDifficulty {
   words: string[];
   directions: Direction[];
   seed: number;
+  tutorial?: {
+    title: string;
+    message: string;
+    type:
+      | 'horizontal'
+      | 'vertical'
+      | 'horizontal-vertical'
+      | 'intersection'
+      | 'diagonal'
+      | 'all-directions'
+      | 'final-challenge';
+  };
 }

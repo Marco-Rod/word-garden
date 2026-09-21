@@ -69,6 +69,19 @@ describe('generatePuzzle', () => {
     expect(puzzles.every(validatePuzzle)).toBe(true);
   });
 
+  it('can explicitly disable intersections for tutorial puzzles', () => {
+    const puzzle = generatePuzzle({
+      size: 6,
+      words: ['GATO', 'OSO', 'PATO'],
+      directions: ['RIGHT', 'DOWN'],
+      allowIntersections: false,
+      intersectionPreference: 1,
+      seed: 42,
+    });
+    expect(puzzle.stats.intersections).toBe(0);
+    expect(puzzle.stats.intersectingWords).toBe(0);
+  });
+
   it('reports direction usage and quality for every generated puzzle', () => {
     const puzzle = generatePuzzle({
       size: 7,

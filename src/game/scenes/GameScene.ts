@@ -20,6 +20,7 @@ interface Pill {
 
 export interface GameSceneData {
   levelId: number;
+  tutorialAcknowledged?: boolean;
 }
 
 const DPR = window.devicePixelRatio || 1;
@@ -40,6 +41,9 @@ export class GameScene extends Phaser.Scene {
   private wordColors = new Map<string, (typeof WORD_FOUND_COLORS)[number]>();
   private wordCounter: Phaser.GameObjects.Text | null = null;
   private wordAreaH = LAYOUT.headerH;
+  private gestureHint: Phaser.GameObjects.Graphics | null = null;
+  private gestureHintTween: Phaser.Tweens.Tween | null = null;
+  private hasInteracted = false;
 
   private pointerDown = false;
   private isComplete = false;
@@ -56,6 +60,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(data: GameSceneData): void {
+    const requestedLevel = levelSystem.get(data.levelId);
+    if (!requestedLevel) throw new Error(`Unknown level ${data.levelId}`);
+    if (requestedLevel.tutorial && !data.tutorialAcknowledged) {
+      this.scene.start('Tutorial', { levelId: data.levelId });
+      return;
+    }
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
@@ -100,6 +110,7 @@ export class GameScene extends Phaser.Scene {
       size: level.size,
       words: level.words,
       directions: level.directions,
+      allowIntersections: level.allowIntersections,
       intersectionPreference: level.intersectionPreference,
       minIntersections: level.minIntersections,
       directionBalance: level.directionBalance,
@@ -113,6 +124,11 @@ export class GameScene extends Phaser.Scene {
 
     this.isComplete = false;
     this.pointerDown = false;
+    this.hasInteracted = false;
+    this.gestureHintTween?.stop();
+    this.gestureHintTween = null;
+    this.gestureHint?.destroy();
+    this.gestureHint = null;
     this.foundWords.clear();
     this.selection = new WordSelection([], level.directions, 0, 0);
     this.session = new GameSession(level);
@@ -120,6 +136,7 @@ export class GameScene extends Phaser.Scene {
 
     this.buildBoard();
     this.ensureDebugOverlay();
+    if (this.level.id === 1) this.time.delayedCall(2500, this.showFirstGestureHint, [], this);
   }
 
   private computeLayout(): { cell: number; boardX: number; boardY: number } {
@@ -333,6 +350,11 @@ export class GameScene extends Phaser.Scene {
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.isComplete) return;
+    this.hasInteracted = true;
+    this.gestureHintTween?.stop();
+    this.gestureHintTween = null;
+    this.gestureHint?.destroy();
+    this.gestureHint = null;
 
     // No usamos el gameobjectdown para iniciar una palabra: los bounds de un
     // objeto interactivo pueden quedar desfasados respecto al canvas durante
@@ -432,7 +454,7 @@ export class GameScene extends Phaser.Scene {
       target.setScale(0.6);
       target.setAlpha(1);
     }
-    this.tweens.add({
+    this.gestureHintTween = this.tweens.add({
       targets: group,
       scale: 1,
       alpha: 1,
@@ -450,5 +472,34 @@ export class GameScene extends Phaser.Scene {
     const result = this.session.complete();
     const totalScore = runProgress.add(result.score);
     this.scene.start('Result', { result, totalScore });
+  }
+
+  private showFirstGestureHint(): void {
+    if (this.hasInteracted || this.isComplete || this.gestureHint || this.puzzle.words.length === 0) return;
+    const example = this.puzzle.words[0];
+    const start = this.tiles[example.start.row]?.[example.start.col];
+    const end = this.tiles[example.end.row]?.[example.end.col];
+    if (!start || !end) return;
+
+    const hint = this.add.graphics().setDepth(80);
+    this.gestureHint = hint;
+    const progress = { value: 0 };
+    this.tweens.add({
+      targets: progress,
+      value: 1,
+      duration: 1100,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+      onUpdate: () => {
+        const x = Phaser.Math.Linear(start.x, end.x, progress.value);
+        const y = Phaser.Math.Linear(start.y, end.y, progress.value);
+        hint.clear();
+        hint.lineStyle(7, 0xfb8c00, 0.75);
+        hint.lineBetween(start.x, start.y, x, y);
+        hint.fillStyle(0xfb8c00, 0.95);
+        hint.fillCircle(x, y, 11);
+      },
+    });
   }
 }

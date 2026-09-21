@@ -12,6 +12,16 @@ describe('LevelSystem', () => {
     expect(system.get(10)?.size).toBe(8);
   });
 
+  it('introduces one mechanic at a time through tutorial levels', () => {
+    expect(system.get(1)?.tutorial?.type).toBe('horizontal');
+    expect(system.get(3)?.directions).toEqual(['DOWN']);
+    expect(system.get(4)?.tutorial?.type).toBe('horizontal-vertical');
+    expect(system.get(5)).toMatchObject({ allowIntersections: true, minIntersections: 1, tutorial: { type: 'intersection' } });
+    expect(system.get(7)).toMatchObject({ directions: ['DIAGONAL_DOWN_RIGHT'], allowIntersections: false });
+    expect(system.get(8)?.tutorial?.type).toBe('all-directions');
+    expect(system.get(10)?.tutorial?.type).toBe('final-challenge');
+  });
+
   it('finds the next level and ends after level 10', () => {
     expect(system.next(1)?.id).toBe(2);
     expect(system.next(10)).toBeUndefined();

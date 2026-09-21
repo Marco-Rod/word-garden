@@ -36,6 +36,7 @@ function placementCandidate(
   word: string,
   start: Position,
   direction: Direction,
+  allowIntersections: boolean,
 ): PlacementCandidate | null {
   const delta = DIRECTION_DELTAS[direction];
   let intersections = 0;
@@ -44,7 +45,7 @@ function placementCandidate(
     const col = start.col + delta.col * i;
     if (row < 0 || row >= size || col < 0 || col >= size) return null;
     const existing = grid[row][col];
-    if (existing !== '' && existing !== word[i]) return null;
+    if (existing !== '' && (existing !== word[i] || !allowIntersections)) return null;
     if (existing === word[i]) intersections++;
   }
   return { start, direction, intersections };
@@ -65,6 +66,7 @@ function placeWord(grid: string[][], word: string, start: Position, direction: D
 export function generatePuzzle(options: PuzzleOptions): Puzzle {
   const { size, seed } = options;
   const directions = options.directions ?? ['RIGHT'];
+  const allowIntersections = options.allowIntersections ?? true;
   const intersectionPreference = clamp(options.intersectionPreference ?? 0, 0, 1);
   const minIntersections = Math.max(0, Math.floor(options.minIntersections ?? 0));
   const minIntersectingWords = Math.max(0, Math.floor(options.minIntersectingWords ?? 0));
@@ -83,7 +85,7 @@ export function generatePuzzle(options: PuzzleOptions): Puzzle {
     let failed = false;
 
     for (const word of words) {
-      const candidates = allCandidates(candidateGrid, size, word, directions);
+      const candidates = allCandidates(candidateGrid, size, word, directions, allowIntersections);
       if (candidates.length === 0) {
         failed = true;
         break;
@@ -143,7 +145,13 @@ export function generatePuzzle(options: PuzzleOptions): Puzzle {
   return puzzle;
 }
 
-function allCandidates(grid: string[][], size: number, word: string, directions: Direction[]): PlacementCandidate[] {
+function allCandidates(
+  grid: string[][],
+  size: number,
+  word: string,
+  directions: Direction[],
+  allowIntersections: boolean,
+): PlacementCandidate[] {
   const candidates: PlacementCandidate[] = [];
   for (const direction of directions) {
     const delta = DIRECTION_DELTAS[direction];
@@ -151,7 +159,7 @@ function allCandidates(grid: string[][], size: number, word: string, directions:
     const maxStartCol = size - delta.col * (word.length - 1);
     for (let row = 0; row < maxStartRow; row++) {
       for (let col = 0; col < maxStartCol; col++) {
-        const candidate = placementCandidate(grid, size, word, { row, col }, direction);
+        const candidate = placementCandidate(grid, size, word, { row, col }, direction, allowIntersections);
         if (candidate) candidates.push(candidate);
       }
     }
