@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { levelSystem } from '../../core/progression/levelProgression';
 import { FILLS, FONT, INK, OUTLINES, WORD_FOUND_COLORS } from '../config';
 import { fitTextToWidth, getLayoutMetrics } from '../layout/ResponsiveLayout';
+import { SvgTutorialView } from '../ui/SvgPanelViews';
 
 interface TutorialSceneData {
   levelId: number;
@@ -19,7 +20,9 @@ type TutorialType =
 const DPR = window.devicePixelRatio || 1;
 
 export class TutorialScene extends Phaser.Scene {
+  private svgView: SvgTutorialView | null = null;
   private buttonBounds: Phaser.Geom.Rectangle | null = null;
+  private mapButtonBounds: Phaser.Geom.Rectangle | null = null;
   private levelId = 1;
 
   constructor() {
@@ -32,10 +35,23 @@ export class TutorialScene extends Phaser.Scene {
       this.scene.start('Game', { levelId: data.levelId, tutorialAcknowledged: true });
       return;
     }
+    const tutorial = level.tutorial;
     this.levelId = data.levelId;
-    this.draw(level.tutorial.title, level.tutorial.message, level.tutorial.type);
+    this.svgView = new SvgTutorialView(
+      data.levelId,
+      tutorial.title,
+      tutorial.message,
+      tutorial.type,
+      () => this.scene.start('Game', { levelId: this.levelId, tutorialAcknowledged: true }),
+      () => this.scene.start('LevelMap'),
+    );
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.svgView?.destroy());
+    this.scale.on('resize', () => this.svgView?.refresh(), this);
+    return;
+
+    this.draw(tutorial.title, tutorial.message, tutorial.type);
     this.input.on('pointerup', this.onPointerUp, this);
-    this.scale.on('resize', () => this.draw(level.tutorial!.title, level.tutorial!.message, level.tutorial!.type), this);
+    this.scale.on('resize', () => this.draw(tutorial.title, tutorial.message, tutorial.type), this);
   }
 
   private draw(title: string, message: string, type: TutorialType): void {
@@ -67,6 +83,15 @@ export class TutorialScene extends Phaser.Scene {
     fitTextToWidth(titleText, title, panelW - 42, mobile ? 26 : 30, 20);
     this.addText(cx, messageY, message, messageSize, INK.body);
     this.addExampleGrid(cx, gridY, type, type === 'final-challenge');
+
+    const mapSize = 34;
+    const mapX = cx - panelW / 2 + 30;
+    const mapY = top + 30;
+    const mapButton = this.add.graphics();
+    mapButton.fillStyle(FILLS.panelBorder, 1);
+    mapButton.fillRoundedRect(mapX - mapSize / 2, mapY - mapSize / 2, mapSize, mapSize, 11);
+    this.addText(mapX, mapY - 2, '←', 24, '#ffffff', true);
+    this.mapButtonBounds = new Phaser.Geom.Rectangle(mapX - mapSize / 2, mapY - mapSize / 2, mapSize, mapSize);
 
     const width = Math.min(panelW - 54, 320);
     const height = 70;
@@ -141,6 +166,10 @@ export class TutorialScene extends Phaser.Scene {
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.mapButtonBounds && Phaser.Geom.Rectangle.Contains(this.mapButtonBounds, pointer.worldX, pointer.worldY)) {
+      this.scene.start('LevelMap');
+      return;
+    }
     if (this.buttonBounds && Phaser.Geom.Rectangle.Contains(this.buttonBounds, pointer.worldX, pointer.worldY)) {
       this.scene.start('Game', { levelId: this.levelId, tutorialAcknowledged: true });
     }

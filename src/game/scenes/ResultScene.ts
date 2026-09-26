@@ -5,6 +5,7 @@ import { getLayoutMetrics } from '../layout/ResponsiveLayout';
 import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { createSafeText } from '../objects/SafeText';
 import type { GameSessionResult } from '../session/GameSession';
+import { SvgResultView } from '../ui/SvgPanelViews';
 
 export interface ResultSceneData {
   result: GameSessionResult;
@@ -14,6 +15,7 @@ export interface ResultSceneData {
 const DPR = window.devicePixelRatio || 1;
 
 export class ResultScene extends Phaser.Scene {
+  private svgView: SvgResultView | null = null;
   private resultData!: ResultSceneData;
   private buttons: Array<{ bounds: Phaser.Geom.Rectangle; action: () => void; visual: Phaser.GameObjects.Container }> = [];
   private readonly refreshInputBounds = (): void => this.scale.updateBounds();
@@ -25,6 +27,16 @@ export class ResultScene extends Phaser.Scene {
 
   create(data: ResultSceneData): void {
     this.resultData = data;
+    this.svgView = new SvgResultView(
+      data.result,
+      data.totalScore,
+      () => this.scene.start('Game', { levelId: levelSystem.next(data.result.levelId)!.id }),
+      () => this.scene.start('LevelMap'),
+    );
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.svgView?.destroy());
+    this.scale.on('resize', () => this.svgView?.refresh(), this);
+    return;
+
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointerup', this.onPointerUp, this);
     this.game.canvas.addEventListener('pointerdown', this.refreshInputBounds, { capture: true, passive: true });

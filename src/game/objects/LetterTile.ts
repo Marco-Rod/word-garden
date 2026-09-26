@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FILLS, OUTLINES, FONT, INK } from '../config';
+import { isVisualPolishExperiment } from '../renderExperiments';
 
 export type TileState = 'idle' | 'selected' | 'found';
 
@@ -96,13 +97,14 @@ export class LetterTile extends Phaser.GameObjects.Container {
   private redraw(state: TileState): void {
     const w = this.width;
     const h = this.height;
-    const radius = Math.round(Math.min(w, h) * 0.18);
+    const polish = isVisualPolishExperiment();
+    const radius = Math.round(Math.min(w, h) * (polish ? 0.16 : 0.18));
     this.bg.clear();
     const fill = state === 'found' && this.foundColors ? this.foundColors.fill : STATE_FILLS[state];
     const stroke = state === 'found' && this.foundColors ? this.foundColors.stroke : STATE_STROKES[state];
     this.bg.fillStyle(fill, 1);
     this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, radius);
-    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * 0.05)), stroke, 1);
+    this.bg.lineStyle(Math.max(2, Math.round(Math.min(w, h) * (polish ? 0.065 : 0.05))), stroke, 1);
     this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
   }
 }

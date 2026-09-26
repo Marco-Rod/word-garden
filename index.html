@@ -30,6 +30,37 @@
         image-rendering: auto;
         -webkit-font-smoothing: antialiased;
       }
+      .word-garden-svg-map {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        width: 100vw;
+        height: 100dvh;
+        overflow: hidden;
+        touch-action: none;
+      }
+      .word-garden-svg-map svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        text-rendering: geometricPrecision;
+      }
+      .word-garden-svg-panel {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        width: 100vw;
+        height: 100dvh;
+        touch-action: none;
+      }
+      .word-garden-svg-panel svg { display: block; width: 100%; height: 100%; text-rendering: geometricPrecision; }
+      .word-garden-svg-board { position: fixed; inset: 0; z-index: 15; width: 100vw; height: 100dvh; pointer-events: none; }
+      .word-garden-svg-board, .word-garden-svg-board svg, .word-garden-svg-board text {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      .word-garden-svg-board svg { display: block; width: 100%; height: 100%; pointer-events: none; touch-action: none; text-rendering: geometricPrecision; }
     </style>
   </head>
   <body>

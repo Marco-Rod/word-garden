@@ -11,6 +11,7 @@ import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { createSafeText } from '../objects/SafeText';
 import { WordSelection } from '../objects/WordSelection';
+import { SvgBoardView } from '../ui/SvgBoardView';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
 
@@ -22,6 +23,12 @@ interface Pill {
   h: number;
 }
 
+interface NavigationButton {
+  bounds: Phaser.Geom.Rectangle;
+  visual: Phaser.GameObjects.Container;
+  action: () => void;
+}
+
 export interface GameSceneData {
   levelId: number;
   tutorialAcknowledged?: boolean;
@@ -30,6 +37,7 @@ export interface GameSceneData {
 const DPR = window.devicePixelRatio || 1;
 
 export class GameScene extends Phaser.Scene {
+  private svgBoard: SvgBoardView | null = null;
   private level!: LevelDefinition;
   private session!: GameSession;
   private puzzle!: Puzzle;
@@ -54,11 +62,16 @@ export class GameScene extends Phaser.Scene {
   private debugTouch = false;
   private debugTouchOverlay: TouchDebugOverlay | null = null;
   private layoutDebugOverlay: LayoutDebugOverlay | null = null;
+  private menuButton: NavigationButton | null = null;
+  private pauseButtons: NavigationButton[] = [];
+  private pauseOverlay: Phaser.GameObjects.Container | null = null;
+  private paused = false;
 
   private headerText: Phaser.GameObjects.Text | null = null;
-  private feedbackPanel: Phaser.GameObjects.Graphics | null = null;
-  private feedbackText: Phaser.GameObjects.Text | null = null;
   private readonly refreshInputBounds = (): void => this.scale.updateBounds();
+  private readonly preventBrowserGesture = (event: TouchEvent): void => {
+    if (event.touches.length === 1) event.preventDefault();
+  };
 
   constructor() {
     super('Game');
@@ -97,6 +110,17 @@ export class GameScene extends Phaser.Scene {
     this.debugTouch = new URLSearchParams(window.location.search).has('debugTouch');
 
     this.loadLevel(data.levelId);
+    this.svgBoard = new SvgBoardView(this.puzzle.grid, this.puzzle.words.map((word) => word.word), this.level.id, () => ({ width: this.scale.width, height: this.scale.height, x: this.boardX, y: this.boardY, cell: this.cell }), {
+      start: (row, col) => this.startSvgSelection(row, col),
+      move: (row, col) => this.moveSvgSelection(row, col),
+      end: (row, col) => this.endSvgSelection(row, col),
+    }, { menu: () => this.openPauseMenu(), pause: (action) => this.handleSvgPause(action) });
+    this.menuButton?.visual.setVisible(false);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.svgBoard?.destroy());
+    // Safari conserva gestos de historial incluso con touch-action en algunos
+    // bordes. Durante juego bloqueamos el scroll/arrastre del documento.
+    document.addEventListener('touchmove', this.preventBrowserGesture, { passive: false });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => document.removeEventListener('touchmove', this.preventBrowserGesture));
   }
 
   private destroyInputBoundsSync(): void {
@@ -166,6 +190,10 @@ export class GameScene extends Phaser.Scene {
     this.layoutDebugOverlay?.destroy();
     this.layoutDebugOverlay = null;
     this.children.removeAll(true);
+    this.menuButton = null;
+    this.pauseButtons = [];
+    this.pauseOverlay = null;
+    this.paused = false;
     this.pillsByWord.clear();
     this.pillsOrder = [];
     this.wordColors = new Map(
@@ -187,6 +215,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.buildPills();
+    this.buildMenuButton();
 
     this.tiles = [];
     for (let row = 0; row < this.puzzle.size; row++) {
@@ -210,19 +239,12 @@ export class GameScene extends Phaser.Scene {
 
     const maxSteps = Math.max(...this.puzzle.words.map((placed) => placed.word.length)) - 1;
     this.selection = new WordSelection(this.tiles, this.level.directions, this.cell, maxSteps);
-
-    this.feedbackPanel = this.add.graphics().setDepth(95).setAlpha(0);
-    this.feedbackText = this.add
-      .text(0, 0, '', {
-        fontFamily: FONT,
-        fontSize: '52px',
-        color: INK.body,
-        fontStyle: 'bold',
-        resolution: DPR,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0)
-      .setDepth(100);
+    // El tablero visible lo dibuja SVG; estos objetos conservan el modelo y la
+    // lógica de selección ya probada sin renderizar un segundo tablero.
+    for (const row of this.tiles) for (const tile of row) tile.setVisible(false);
+    this.headerText?.setVisible(false);
+    this.wordCounter?.setVisible(false);
+    this.pillsOrder.forEach((pill) => pill.container.setVisible(false));
 
     if (isLayoutDebugEnabled() && this.headerText && this.wordCounter) {
       this.layoutDebugOverlay = new LayoutDebugOverlay(this);
@@ -270,6 +292,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.recenterPills();
+    this.svgBoard?.refresh();
   }
 
   private recenterPills(): void {
@@ -285,6 +308,95 @@ export class GameScene extends Phaser.Scene {
       );
     }
     this.wordCounter?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 47 : 47);
+  }
+
+  private buildMenuButton(): void {
+    const size = getLayoutMetrics(this.scale).isCompact ? 38 : 42;
+    const x = this.scale.width - size / 2 - 8;
+    const y = getLayoutMetrics(this.scale).isCompact ? 22 : 26;
+    const visual = this.add.container(x, y).setDepth(60);
+    const background = this.add.graphics();
+    background.fillStyle(FILLS.panel, 0.96);
+    background.fillRoundedRect(-size / 2, -size / 2, size, size, 13);
+    background.lineStyle(2, FILLS.panelBorder, 1);
+    background.strokeRoundedRect(-size / 2, -size / 2, size, size, 13);
+    const icon = createSafeText(this, 0, -2, '☰', { fontFamily: FONT, fontSize: `${Math.round(size * 0.56)}px`, color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(0.5);
+    visual.add([background, icon]);
+    this.menuButton = {
+      bounds: new Phaser.Geom.Rectangle(x - size / 2, y - size / 2, size, size),
+      visual,
+      action: () => this.openPauseMenu(),
+    };
+  }
+
+  private openPauseMenu(): void {
+    if (this.paused || this.isComplete) return;
+    this.paused = true;
+    this.pointerDown = false;
+    this.selection.clear();
+    this.gestureHintTween?.stop();
+    this.gestureHint?.destroy();
+    this.gestureHint = null;
+    if (this.svgBoard) {
+      this.svgBoard.showPause();
+      return;
+    }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const compact = getLayoutMetrics(this.scale).isCompact;
+    const cx = width / 2;
+    const cy = height / 2;
+    const panelW = Math.min(width - (compact ? 34 : 72), 390);
+    const panelH = compact ? 300 : 322;
+    const overlay = this.add.container(cx, cy).setDepth(200);
+    const shade = this.add.graphics();
+    shade.fillStyle(0x12354b, 0.56);
+    shade.fillRect(-cx, -cy, width, height);
+    const panel = this.add.graphics();
+    panel.fillStyle(FILLS.panel, 0.98);
+    panel.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 28);
+    panel.lineStyle(4, FILLS.panelBorder, 1);
+    panel.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 28);
+    overlay.add([shade, panel]);
+    overlay.add(createSafeText(this, 0, -panelH / 2 + 45, 'PAUSA', { fontFamily: FONT, fontSize: compact ? '28px' : '32px', color: INK.dark, fontStyle: 'bold', resolution: DPR }).setOrigin(0.5));
+    overlay.add(createSafeText(this, 0, -panelH / 2 + 77, `Nivel ${this.level.id}`, { fontFamily: FONT, fontSize: compact ? '17px' : '19px', color: INK.body, resolution: DPR }).setOrigin(0.5));
+    this.pauseOverlay = overlay;
+    this.pauseButtons = [];
+    this.addPauseButton(overlay, 0, -25, 'CONTINUAR', false, () => this.closePauseMenu());
+    this.addPauseButton(overlay, 0, 48, 'REINICIAR NIVEL', true, () => this.scene.restart({ levelId: this.level.id, tutorialAcknowledged: true }));
+    this.addPauseButton(overlay, 0, 121, 'VOLVER AL MAPA', true, () => this.scene.start('LevelMap'));
+  }
+
+  private addPauseButton(overlay: Phaser.GameObjects.Container, x: number, y: number, label: string, secondary: boolean, action: () => void): void {
+    const compact = getLayoutMetrics(this.scale).isCompact;
+    const width = Math.min(this.scale.width - 82, 300);
+    const height = compact ? 54 : 58;
+    const visual = this.add.container(x, y);
+    const background = this.add.graphics();
+    background.fillStyle(secondary ? FILLS.panelBorder : FILLS.button, 1);
+    background.fillRoundedRect(-width / 2, -height / 2, width, height, 17);
+    visual.add([background, createSafeText(this, 0, 0, label, { fontFamily: FONT, fontSize: compact ? '18px' : '20px', color: '#ffffff', fontStyle: 'bold', resolution: DPR }).setOrigin(0.5)]);
+    overlay.add(visual);
+    this.pauseButtons.push({
+      bounds: new Phaser.Geom.Rectangle(this.scale.width / 2 + x - width / 2, this.scale.height / 2 + y - height / 2, width, height),
+      visual,
+      action,
+    });
+  }
+
+  private closePauseMenu(): void {
+    if (this.svgBoard) this.svgBoard.hidePause();
+    this.pauseOverlay?.destroy(true);
+    this.pauseOverlay = null;
+    this.pauseButtons = [];
+    this.paused = false;
+  }
+
+  private handleSvgPause(action: 'continue' | 'restart' | 'map'): void {
+    if (action === 'continue') this.closePauseMenu();
+    if (action === 'restart') this.scene.restart({ levelId: this.level.id, tutorialAcknowledged: true });
+    if (action === 'map') this.scene.start('LevelMap');
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
@@ -338,6 +450,8 @@ export class GameScene extends Phaser.Scene {
 
   private recenter(): void {
     if (!this.puzzle) return;
+    const reopenPause = this.paused;
+    if (reopenPause) this.closePauseMenu();
     this.wordAreaH = this.wordListLayout().areaH;
     const availH = this.scale.height - this.wordAreaH - LAYOUT.bottomH;
     const boardPx = this.cell * this.puzzle.size;
@@ -355,17 +469,29 @@ export class GameScene extends Phaser.Scene {
 
     this.recenterPills();
     this.headerText?.setPosition(this.scale.width / 2, getLayoutMetrics(this.scale).isCompact ? 18 : 24);
-
-    if (this.feedbackText && this.feedbackPanel) {
-      const cx = this.scale.width / 2;
-      const cy = this.scale.height / 2 - 8;
-      this.feedbackPanel.setPosition(cx, cy);
-      this.feedbackText.setPosition(cx, cy);
+    if (this.menuButton) {
+      const size = getLayoutMetrics(this.scale).isCompact ? 38 : 42;
+      const x = this.scale.width - size / 2 - 8;
+      const y = getLayoutMetrics(this.scale).isCompact ? 22 : 26;
+      this.menuButton.visual.setPosition(x, y);
+      this.menuButton.bounds.setTo(x - size / 2, y - size / 2, size, size);
     }
+
+    if (reopenPause) this.openPauseMenu();
 
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    const navigation = this.paused
+      ? this.pauseButtons.find(({ bounds }) => Phaser.Geom.Rectangle.Contains(bounds, pointer.worldX, pointer.worldY))
+      : this.menuButton && Phaser.Geom.Rectangle.Contains(this.menuButton.bounds, pointer.worldX, pointer.worldY)
+        ? this.menuButton
+        : undefined;
+    if (navigation) {
+      navigation.visual.setScale(0.96);
+      return;
+    }
+    if (this.paused) return;
     if (this.isComplete) return;
     this.hasInteracted = true;
     this.gestureHintTween?.stop();
@@ -381,6 +507,39 @@ export class GameScene extends Phaser.Scene {
 
     this.pointerDown = true;
     this.selection.startAt(tile);
+  }
+
+  private startSvgSelection(row: number, col: number): void {
+    if (this.paused || this.isComplete) return;
+    const tile = this.tiles[row]?.[col];
+    if (!tile) return;
+    this.pointerDown = true;
+    this.selection.startAt(tile);
+    this.svgBoard?.setSelection(this.selection.tiles);
+  }
+
+  private moveSvgSelection(row: number, col: number): void {
+    if (!this.pointerDown || !this.selection.isActive() || this.isComplete) return;
+    const tile = this.tiles[row]?.[col];
+    if (!tile) return;
+    this.selection.moveTo(tile.x, tile.y);
+    this.svgBoard?.setSelection(this.selection.tiles);
+  }
+
+  private endSvgSelection(row: number, col: number): void {
+    if (!this.pointerDown) return;
+    if (row >= 0 && col >= 0) this.moveSvgSelection(row, col);
+    this.pointerDown = false;
+    if (!this.selection.isActive() || this.isComplete) return;
+    const cells = this.selection.tiles.map((tile) => ({ row: tile.row, col: tile.col }));
+    const remaining = this.puzzle.words.filter((word) => !this.foundWords.has(word.word));
+    const placed = matchSelection(cells, remaining);
+    if (placed) this.onWordFound(placed);
+    else {
+      if (this.selection.length > 1) this.session.registerError();
+      this.svgBoard?.clearSelection();
+    }
+    this.selection.clear();
   }
 
   private tileNearestTo(worldX: number, worldY: number): LetterTile | null {
@@ -404,6 +563,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.paused) {
+      for (const button of this.pauseButtons) button.visual.setScale(1);
+      this.pauseButtons.find(({ bounds }) => Phaser.Geom.Rectangle.Contains(bounds, pointer.worldX, pointer.worldY))?.action();
+      return;
+    }
+    if (this.menuButton && Phaser.Geom.Rectangle.Contains(this.menuButton.bounds, pointer.worldX, pointer.worldY)) {
+      this.menuButton.visual.setScale(1);
+      this.menuButton.action();
+      return;
+    }
     this.pointerDown = false;
     if (!this.selection.isActive() || this.isComplete) return;
 
@@ -427,6 +596,9 @@ export class GameScene extends Phaser.Scene {
 
   private onWordFound(placed: PlacedWord): void {
     const color = this.wordColors.get(placed.word) ?? WORD_FOUND_COLORS[0];
+    this.svgBoard?.setWordFound(placed.word);
+    this.svgBoard?.setFound(this.selection.tiles, color.fill, color.stroke);
+    this.svgBoard?.showFeedback(`${placed.word} ✓`);
     for (const tile of this.selection.tiles) {
       tile.setFoundColor(color.fill, color.stroke);
       tile.pop();
@@ -436,51 +608,10 @@ export class GameScene extends Phaser.Scene {
     this.session.wordFound(placed.word);
     this.wordCounter?.setText(`${this.foundWords.size} / ${this.puzzle.words.length} palabras`);
     this.markPillFound(placed.word);
-    this.showFeedback(placed.word);
 
     if (this.foundWords.size === this.puzzle.words.length) {
       this.time.delayedCall(400, () => this.completeLevel());
     }
-  }
-
-  private showFeedback(word: string): void {
-    if (!this.feedbackText || !this.feedbackPanel) return;
-
-    this.feedbackText.setText(`${word} ✓`);
-
-    const cx = this.scale.width / 2;
-    const cy = this.scale.height / 2 - 8;
-    this.feedbackPanel.setPosition(cx, cy);
-    this.feedbackText.setPosition(cx, cy);
-
-    const padX = 38;
-    const w = this.feedbackText.width + padX * 2;
-    const h = 30 + this.feedbackText.height + 18;
-    this.feedbackPanel.clear();
-    this.feedbackPanel.fillStyle(FILLS.panel, 0.95);
-    this.feedbackPanel.fillRoundedRect(-w / 2, -h / 2, w, h, 26);
-    this.feedbackPanel.lineStyle(4, FILLS.panelBorder, 1);
-    this.feedbackPanel.strokeRoundedRect(-w / 2, -h / 2, w, h, 26);
-
-    const group: Array<Phaser.GameObjects.Graphics | Phaser.GameObjects.Text> = [
-      this.feedbackPanel,
-      this.feedbackText,
-    ];
-    for (const target of group) {
-      this.tweens.killTweensOf(target);
-      target.setScale(0.6);
-      target.setAlpha(1);
-    }
-    this.gestureHintTween = this.tweens.add({
-      targets: group,
-      scale: 1,
-      alpha: 1,
-      duration: 170,
-      ease: 'Back.easeOut',
-      onComplete: () => {
-        this.tweens.add({ targets: group, alpha: 0, scale: 0.85, delay: 800, duration: 220 });
-      },
-    });
   }
 
   private completeLevel(): void {

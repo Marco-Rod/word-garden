@@ -6,6 +6,8 @@ import { FILLS, FONT, INK } from '../config';
 import { MapEnvironment } from '../objects/MapEnvironment';
 import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { createSafeText } from '../objects/SafeText';
+import { isVisualPolishExperiment } from '../renderExperiments';
+import { SvgMapView } from '../ui/SvgMapView';
 
 const DPR = window.devicePixelRatio || 1;
 const DESKTOP_MAP_HEIGHT = 1_470;
@@ -20,6 +22,7 @@ interface MapNode {
 }
 
 export class LevelMapScene extends Phaser.Scene {
+  private svgMap: SvgMapView | null = null;
   private map: Phaser.GameObjects.Container | null = null;
   private nodes: MapNode[] = [];
   private mapOffset = 0;
@@ -37,6 +40,15 @@ export class LevelMapScene extends Phaser.Scene {
   }
 
   create(): void {
+    // El mapa es UI/vector estático: SVG conserva sus curvas y tipografía
+    // nítidas en pantallas HiDPI. Phaser permanece a cargo del tablero.
+    this.svgMap = new SvgMapView((levelId) => this.scene.start('Game', { levelId }));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.svgMap?.destroy());
+    // El primer resize de Phaser puede llegar después de crear la escena en
+    // móvil; volver a centrar evita conservar un offset calculado para desktop.
+    this.scale.on('resize', () => this.svgMap?.refresh(true), this);
+    return;
+
     this.draw(true);
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
@@ -113,12 +125,13 @@ export class LevelMapScene extends Phaser.Scene {
   private drawPath(points: Array<{ x: number; y: number }>): void {
     if (!this.map) return;
     const path = this.add.graphics();
-    const widthScale = this.mobileMap ? 1.22 : 1;
-    path.lineStyle(25 * widthScale, 0xb8834c, 0.72);
+    const polish = isVisualPolishExperiment();
+    const widthScale = (this.mobileMap ? 1.22 : 1) * (polish ? 1.13 : 1);
+    path.lineStyle(25 * widthScale, 0xb8834c, polish ? 0.82 : 0.72);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
     path.lineStyle(17 * widthScale, 0xf3d18a, 1);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
-    path.lineStyle(3 * widthScale, 0xffecc0, 0.75);
+    path.lineStyle((polish ? 4 : 3) * widthScale, 0xffecc0, polish ? 0.9 : 0.75);
     for (let index = 0; index < points.length - 1; index++) path.lineBetween(points[index].x, points[index].y, points[index + 1].x, points[index + 1].y);
     this.map.add(path);
   }
@@ -138,7 +151,8 @@ export class LevelMapScene extends Phaser.Scene {
     }
     drawing.fillStyle(completed ? 0x81c784 : unlocked ? 0xffcc80 : 0x90a4ae, unlocked ? 1 : 0.7);
     drawing.fillCircle(0, 0, radius);
-    drawing.lineStyle(isChallenge ? 6 : 4, completed ? 0x2e7d32 : unlocked ? 0xef6c00 : 0x607d8b, 1);
+    const polish = isVisualPolishExperiment();
+    drawing.lineStyle((isChallenge ? 6 : 4) * (polish ? 1.22 : 1), completed ? 0x2e7d32 : unlocked ? 0xef6c00 : 0x607d8b, 1);
     drawing.strokeCircle(0, 0, radius);
     if (completed) {
       drawing.lineStyle(3, 0x66bb6a, 0.9);
