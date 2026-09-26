@@ -1,8 +1,59 @@
 import type { Cell } from '../../core/puzzle/types';
+import { visualForLevel } from '../../data/themes';
 
 interface BoardLayout { width: number; height: number; x: number; y: number; cell: number; }
 interface BoardCallbacks { start: (row: number, col: number) => void; move: (row: number, col: number) => void; end: (row: number, col: number) => void; }
 interface HudCallbacks { menu: () => void; sound: () => void; muted: () => boolean; pause: (action: 'continue' | 'restart' | 'map') => void; }
+
+export interface WordListLayout {
+  columns: number;
+  pillW: number;
+  pillH: number;
+  gap: number;
+  fontSize: number;
+  areaH: number;
+}
+
+const WORD_LIST_TOP = 58;
+const WORD_LIST_SIDE_PADDING = 30;
+
+/**
+ * One source of truth for the word chips and the space reserved above the
+ * board. Keeping these together prevents a long list from growing into the
+ * first row of tiles.
+ */
+export function getWordListLayout(width: number, words: readonly string[]): WordListLayout {
+  const gap = 10;
+  const available = Math.max(1, width - WORD_LIST_SIDE_PADDING * 2);
+  const longest = Math.max(1, ...words.map((word) => word.length));
+  let fontSize = 22;
+  let columns = 1;
+  let pillW = available;
+
+  // Prefer compact rows, but only when every label still fits inside its chip.
+  while (fontSize >= 17) {
+    let candidateColumns = Math.min(3, words.length);
+    const minimumWidth = Math.ceil(longest * fontSize * .62 + 30);
+    while (candidateColumns > 1 && (available - gap * (candidateColumns - 1)) / candidateColumns < minimumWidth) candidateColumns--;
+    const candidateWidth = Math.floor((available - gap * (candidateColumns - 1)) / candidateColumns);
+    columns = candidateColumns;
+    pillW = candidateWidth;
+    if (candidateWidth >= minimumWidth) break;
+    fontSize--;
+  }
+
+  const pillH = Math.max(42, fontSize + 18);
+  const rows = Math.ceil(words.length / columns);
+  return {
+    columns,
+    pillW,
+    pillH,
+    gap,
+    fontSize,
+    // Includes the last chip plus a safety gutter before the board starts.
+    areaH: WORD_LIST_TOP + rows * pillH + Math.max(0, rows - 1) * gap + 16,
+  };
+}
 
 const NS = 'http://www.w3.org/2000/svg';
 const create = <Tag extends keyof SVGElementTagNameMap>(tag: Tag, attrs: Record<string, string | number>): SVGElementTagNameMap[Tag] => {
@@ -36,6 +87,7 @@ export class SvgBoardView {
     const { width, height, x, y, cell } = this.layout();
     this.svg.replaceChildren(); this.cells.clear();
     this.svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    this.drawWorldBackdrop(width, height);
     for (let row = 0; row < this.grid.length; row++) for (let col = 0; col < this.grid[row].length; col++) {
       const key = `${row}:${col}`; const px = x + col * cell; const py = y + row * cell;
       const tile = create('rect', { x: px + 1, y: py + 1, width: cell - 2, height: cell - 2, rx: Math.round(cell * .18), fill: '#ffffff', stroke: '#29b6f6', 'stroke-width': Math.max(2, Math.round(cell * .05)), 'pointer-events': 'all', 'data-cell': key });
@@ -102,8 +154,46 @@ export class SvgBoardView {
     const header = create('g', { 'pointer-events': 'none' }); this.addText(header, width / 2, 18, `NIVEL ${this.levelId}`, 22, '#1b4f72'); this.addText(header, width / 2, 47, `${this.foundWords.size} / ${this.words.length} palabras`, 16, '#5d4037'); this.svg.append(header);
     const sound = create('g', { 'data-action': 'sound', 'pointer-events': 'all' }); sound.append(create('rect', { x: 8, y: 3, width: 38, height: 38, rx: 13, fill: '#ffffff', stroke: '#ffca28', 'stroke-width': 2 })); this.addText(sound, 27, 21, this.hudCallbacks.muted() ? '🔇' : '🔊', 18, '#1b4f72'); this.svg.append(sound);
     const menu = create('g', { 'data-action': 'menu', 'pointer-events': 'all' }); menu.append(create('rect', { x: width - 46, y: 3, width: 38, height: 38, rx: 13, fill: '#ffffff', stroke: '#ffca28', 'stroke-width': 2 })); this.addText(menu, width - 27, 21, '☰', 24, '#1b4f72'); this.svg.append(menu);
-    const fontSize = 22; const gap = 10; const available = width - 60; const longest = Math.max(...this.words.map((word) => word.length)); const minW = longest * fontSize * .64 + 28; let columns = Math.min(3, this.words.length); while (columns > 1 && (available - gap * (columns - 1)) / columns < minW) columns--; const pillW = Math.floor((available - gap * (columns - 1)) / columns);
-    this.words.forEach((word, index) => { const row = Math.floor(index / columns); const col = index % columns; const x = (width - (columns * pillW + (columns - 1) * gap)) / 2 + col * (pillW + gap); const y = 58 + row * 54; const found = this.foundWords.has(word); const group = create('g', { 'pointer-events': 'none' }); group.append(create('rect', { x, y, width: pillW, height: 42, rx: 14, fill: found ? '#a5d6a7' : '#ffffff', 'fill-opacity': '.92', stroke: found ? '#2e7d32' : '#ffca28', 'stroke-width': 2 })); this.addText(group, x + pillW / 2, y + 21, found ? `✓ ${word}` : word, fontSize, '#5d4037'); this.svg.append(group); });
+    const layout = getWordListLayout(width, this.words);
+    this.words.forEach((word, index) => {
+      const row = Math.floor(index / layout.columns); const col = index % layout.columns;
+      const x = (width - (layout.columns * layout.pillW + (layout.columns - 1) * layout.gap)) / 2 + col * (layout.pillW + layout.gap);
+      const y = WORD_LIST_TOP + row * (layout.pillH + layout.gap);
+      const found = this.foundWords.has(word);
+      const label = found ? `✓ ${word}` : word;
+      // The label may be slightly narrower than an average glyph estimate.
+      // Scaling it per chip guarantees that no word escapes over the board.
+      const labelSize = Math.max(16, Math.min(layout.fontSize, (layout.pillW - 26) / Math.max(1, label.length * .62)));
+      const group = create('g', { 'pointer-events': 'none' });
+      group.append(create('rect', { x, y, width: layout.pillW, height: layout.pillH, rx: 14, fill: found ? '#a5d6a7' : '#ffffff', 'fill-opacity': '.92', stroke: found ? '#2e7d32' : '#ffca28', 'stroke-width': 2 }));
+      this.addText(group, x + layout.pillW / 2, y + layout.pillH / 2, label, labelSize, '#5d4037');
+      this.svg.append(group);
+    });
+  }
+  private drawWorldBackdrop(width: number, height: number): void {
+    const visual = visualForLevel(this.levelId);
+    this.svg.append(create('rect', { width, height, fill: visual.boardBackground, 'pointer-events': 'none' }));
+    const decorations = create('g', { opacity: '.28', 'pointer-events': 'none' });
+    const points = [[34, 310], [width - 34, 370], [42, height - 78], [width - 45, height - 112]];
+    for (const [x, y] of points) {
+      if (visual.kind === 'water') {
+        decorations.append(create('path', { d: `M ${x - 22} ${y} Q ${x - 11} ${y - 9} ${x} ${y} T ${x + 22} ${y}`, fill: 'none', stroke: visual.detail, 'stroke-width': 4 }));
+      } else if (visual.kind === 'forest' || visual.kind === 'garden') {
+        decorations.append(create('circle', { cx: x, cy: y, r: 18, fill: visual.detail }));
+        decorations.append(create('circle', { cx: x + 14, cy: y + 7, r: 13, fill: visual.wave }));
+      } else if (visual.kind === 'space' || visual.kind === 'magic') {
+        decorations.append(create('circle', { cx: x, cy: y, r: 5, fill: visual.detail }));
+        decorations.append(create('circle', { cx: x + 14, cy: y - 16, r: 2.5, fill: '#ffffff' }));
+      } else if (visual.kind === 'cloud' || visual.kind === 'ice') {
+        decorations.append(create('circle', { cx: x - 9, cy: y + 3, r: 11, fill: '#ffffff' }));
+        decorations.append(create('circle', { cx: x + 4, cy: y - 3, r: 15, fill: '#ffffff' }));
+      } else if (visual.kind === 'fire') {
+        decorations.append(create('path', { d: `M ${x} ${y + 20} C ${x - 18} ${y + 4} ${x - 3} ${y - 22} ${x + 9} ${y - 4} C ${x + 23} ${y + 7} ${x + 9} ${y + 24} ${x} ${y + 20} Z`, fill: visual.detail }));
+      } else {
+        decorations.append(create('ellipse', { cx: x, cy: y, rx: 22, ry: 12, fill: visual.detail }));
+      }
+    }
+    this.svg.append(decorations);
   }
   private addText(parent: SVGElement, x: number, y: number, value: string, size: number, color: string, weight = 700): void { const text = create('text', { x, y, fill: color, 'font-family': 'Arial, sans-serif', 'font-size': size, 'font-weight': weight, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'pointer-events': 'none' }); text.textContent = value; parent.append(text); }
   private addButton(parent: SVGElement, x: number, y: number, label: string, fill: string, action: string): void { const group = create('g', { 'data-action': action, 'pointer-events': 'all' }); group.append(create('rect', { x: x - 145, y: y - 27, width: 290, height: 54, rx: 17, fill })); this.addText(group, x, y, label, 18, '#ffffff'); parent.append(group); }

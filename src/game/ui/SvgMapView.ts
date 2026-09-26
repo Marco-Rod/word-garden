@@ -1,7 +1,7 @@
 import { levelSystem } from '../../core/progression/levelProgression';
 import { progressSystem } from '../../core/progression/playerProgression';
 import type { LevelProgress } from '../../core/progression/ProgressRepository';
-import { themeForLevel } from '../../data/themes';
+import { LEVEL_THEMES, themeForLevel, THEME_VISUALS } from '../../data/themes';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MOBILE_NODE_SPACING = 180;
@@ -95,6 +95,7 @@ export class SvgMapView {
     }));
     this.drawTerrain(map, width, spacing);
     this.drawPath(map);
+    this.drawWorldLabels(map, width);
     for (const node of this.nodes) this.drawNode(map, node);
     this.drawHeader(width, height, progressSystem.totalStars());
   }
@@ -110,12 +111,12 @@ export class SvgMapView {
   private drawTerrain(parent: SVGElement, width: number, spacing: number): void {
     const mapBackground = element('rect', { width, height: this.mapHeight, fill: '#8fd3ff' });
     parent.append(mapBackground);
-    for (const themeStart of [1, 6, 11, 16]) {
-      const members = this.nodes.filter((node) => node.id >= themeStart && node.id < themeStart + 5);
+    for (const theme of LEVEL_THEMES) {
+      const members = this.nodes.filter((node) => node.id >= theme.startLevel && node.id <= theme.endLevel);
       if (members.length === 0) continue;
       const top = Math.min(...members.map((node) => node.y)) - spacing / 2;
       const bottom = Math.max(...members.map((node) => node.y)) + spacing / 2;
-      this.drawBiome(parent, width, top, bottom, themeForLevel(themeStart)?.id ?? 'garden');
+      this.drawBiome(parent, width, top, bottom, theme.id);
     }
     // Líneas muy suaves marcan el paso de un nivel al siguiente; las más
     // visibles anuncian el cambio de mundo cada cinco niveles.
@@ -123,41 +124,68 @@ export class SvgMapView {
       const y = (this.nodes[index].y + this.nodes[index + 1].y) / 2;
       const changingTheme = themeForLevel(this.nodes[index].id)?.id !== themeForLevel(this.nodes[index + 1].id)?.id;
       parent.append(element('path', { d: `M 0 ${y} Q ${width / 2} ${y - 18} ${width} ${y}`, fill: 'none', stroke: changingTheme ? '#ffffff' : '#4f8f63', 'stroke-width': changingTheme ? 5 : 1.5, opacity: changingTheme ? '.72' : '.18', 'stroke-dasharray': changingTheme ? '11 8' : '5 12' }));
-      if (changingTheme) addText(parent, width / 2, y - 22, themeForLevel(this.nodes[index + 1].id)?.name.toUpperCase() ?? '', 14, '#1b4f72');
     }
   }
 
   private drawBiome(parent: SVGElement, width: number, top: number, bottom: number, theme: string): void {
-    const palettes: Record<string, { fill: string; wave: string; detail: string }> = {
-      garden: { fill: '#dcedc8', wave: '#b9dc8f', detail: '#66a94a' },
-      trail: { fill: '#f7dfab', wave: '#f3c87b', detail: '#b8834c' },
-      forest: { fill: '#b9dca7', wave: '#78aa67', detail: '#356b3b' },
-      space: { fill: '#b7b5e2', wave: '#8582c6', detail: '#4f4a91' },
-    };
-    const palette = palettes[theme];
+    const palette = THEME_VISUALS[theme] ?? THEME_VISUALS.garden;
     parent.append(element('path', { d: `M 0 ${top} Q ${width * .28} ${top - 26} ${width * .54} ${top + 10} T ${width} ${top} V ${bottom} Q ${width * .72} ${bottom + 22} ${width * .42} ${bottom - 8} T 0 ${bottom} Z`, fill: palette.fill }));
     parent.append(element('path', { d: `M 0 ${top + 42} Q ${width * .3} ${top + 10} ${width * .62} ${top + 50} T ${width} ${top + 32} V ${top + 92} Q ${width * .72} ${top + 65} ${width * .4} ${top + 98} T 0 ${top + 78} Z`, fill: palette.wave, opacity: '.38' }));
     for (let index = 0; index < 6; index++) {
       const x = index % 2 ? width - 34 - (index % 3) * 20 : 34 + (index % 3) * 24;
       const y = top + 105 + index * ((bottom - top - 170) / 5);
       const decoration = element('g', { opacity: '.9' });
-      if (theme === 'garden') {
+      if (palette.kind === 'garden') {
         decoration.append(element('ellipse', { cx: x, cy: y + 8, rx: 10, ry: 15, fill: palette.detail }));
         decoration.append(element('circle', { cx: x + 5, cy: y - 4, r: 7, fill: '#ff8a9a' }));
         decoration.append(element('circle', { cx: x + 5, cy: y - 4, r: 2.5, fill: '#fff3a3' }));
-      } else if (theme === 'trail') {
+      } else if (palette.kind === 'sand') {
         decoration.append(element('ellipse', { cx: x, cy: y, rx: 14, ry: 9, fill: '#a1887f' }));
         decoration.append(element('ellipse', { cx: x - 3, cy: y - 2, rx: 6, ry: 3, fill: '#d7ccc8' }));
-      } else if (theme === 'forest') {
+      } else if (palette.kind === 'forest') {
         decoration.append(element('rect', { x: x - 3, y, width: 6, height: 24, rx: 2, fill: '#6d4c41' }));
         decoration.append(element('path', { d: `M ${x} ${y - 34} L ${x - 20} ${y + 3} L ${x + 20} ${y + 3} Z`, fill: palette.detail }));
         decoration.append(element('path', { d: `M ${x} ${y - 18} L ${x - 17} ${y + 14} L ${x + 17} ${y + 14} Z`, fill: '#4f8f43' }));
+      } else if (palette.kind === 'water') {
+        decoration.append(element('path', { d: `M ${x - 16} ${y} Q ${x - 8} ${y - 8} ${x} ${y} T ${x + 16} ${y}`, fill: 'none', stroke: '#ffffff', 'stroke-width': 3, opacity: '.8' }));
+        decoration.append(element('circle', { cx: x + 8, cy: y - 12, r: 5, fill: '#ffb6c9' }));
+      } else if (palette.kind === 'ice') {
+        decoration.append(element('path', { d: `M ${x} ${y - 16} L ${x + 14} ${y + 10} L ${x - 13} ${y + 10} Z`, fill: '#ffffff', opacity: '.8' }));
+        decoration.append(element('path', { d: `M ${x} ${y - 10} L ${x} ${y + 15} M ${x - 12} ${y + 3} L ${x + 12} ${y + 3}`, stroke: palette.detail, 'stroke-width': 2, opacity: '.75' }));
+      } else if (palette.kind === 'city') {
+        decoration.append(element('rect', { x: x - 13, y: y - 18, width: 26, height: 28, rx: 3, fill: palette.detail }));
+        for (let window = 0; window < 4; window++) decoration.append(element('rect', { x: x - 8 + (window % 2) * 9, y: y - 12 + Math.floor(window / 2) * 10, width: 4, height: 5, fill: '#fff3a3' }));
+      } else if (palette.kind === 'fire') {
+        decoration.append(element('path', { d: `M ${x} ${y + 15} C ${x - 17} ${y + 2} ${x - 4} ${y - 22} ${x + 5} ${y - 6} C ${x + 18} ${y - 18} ${x + 20} ${y + 11} ${x} ${y + 15} Z`, fill: '#e85d2a' }));
+        decoration.append(element('path', { d: `M ${x} ${y + 10} C ${x - 7} ${y + 1} ${x + 1} ${y - 10} ${x + 6} ${y + 2} C ${x + 10} ${y - 5} ${x + 11} ${y + 7} ${x} ${y + 10} Z`, fill: '#ffeb75' }));
+      } else if (palette.kind === 'cloud') {
+        decoration.append(element('circle', { cx: x - 8, cy: y, r: 9, fill: '#ffffff', opacity: '.88' }));
+        decoration.append(element('circle', { cx: x + 3, cy: y - 5, r: 12, fill: '#ffffff', opacity: '.88' }));
+        decoration.append(element('circle', { cx: x + 15, cy: y + 2, r: 8, fill: '#ffffff', opacity: '.88' }));
       } else {
         decoration.append(element('circle', { cx: x, cy: y, r: 3, fill: '#ffffff' }));
         decoration.append(element('circle', { cx: x + 12, cy: y - 16, r: 1.8, fill: '#fff9c4' }));
         if (index % 2 === 0) decoration.append(element('circle', { cx: x - 9, cy: y + 18, r: 7, fill: '#d9d7ff', opacity: '.75' }));
       }
       parent.append(decoration);
+    }
+  }
+
+  /** Labels are deliberately drawn after the path, with their own plaque. */
+  private drawWorldLabels(parent: SVGElement, width: number): void {
+    for (let index = 0; index < this.nodes.length - 1; index++) {
+      const current = this.nodes[index];
+      const next = this.nodes[index + 1];
+      const nextTheme = themeForLevel(next.id);
+      if (!nextTheme || nextTheme.id === themeForLevel(current.id)?.id) continue;
+      const y = (current.y + next.y) / 2 - 22;
+      const label = nextTheme.name.toUpperCase();
+      const visual = THEME_VISUALS[nextTheme.id] ?? THEME_VISUALS.garden;
+      const labelWidth = Math.min(width - 42, Math.max(160, label.length * 8.6 + 34));
+      const group = element('g', { 'pointer-events': 'none' });
+      group.append(element('rect', { x: width / 2 - labelWidth / 2, y: y - 16, width: labelWidth, height: 32, rx: 16, fill: '#ffffff', opacity: '.92', stroke: visual.detail, 'stroke-width': 2 }));
+      addText(group, width / 2, y + 1, label, 14, visual.detail);
+      parent.append(group);
     }
   }
 
@@ -269,7 +297,8 @@ function routePalette(theme: string): { edge: string; base: string; highlight: s
   if (theme === 'trail') return { edge: '#b8834c', base: '#f3d18a', highlight: '#ffedc2' };
   if (theme === 'forest') return { edge: '#356b3b', base: '#75a84d', highlight: '#c9e69a' };
   if (theme === 'space') return { edge: '#394377', base: '#7674bd', highlight: '#ddd9ff', dash: '18 9', highlightDash: '3 24' };
-  return { edge: '#55874a', base: '#9ccc65', highlight: '#e4f6b7' };
+  const visual = THEME_VISUALS[theme] ?? THEME_VISUALS.garden;
+  return { edge: visual.detail, base: visual.wave, highlight: '#fff7d5' };
 }
 
 function routeCurve(start: Pick<NodePosition, 'x' | 'y'>, end: Pick<NodePosition, 'x' | 'y'>, index: number): string {

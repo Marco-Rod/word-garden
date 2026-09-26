@@ -7,6 +7,16 @@ export interface LevelTheme {
   words?: readonly string[];
 }
 
+export interface ThemeVisual {
+  /** Main world surface, used on the map and lightly behind the board. */
+  fill: string;
+  wave: string;
+  detail: string;
+  /** Low-contrast sky colour that keeps the word board easy to read. */
+  boardBackground: string;
+  kind: 'garden' | 'sand' | 'forest' | 'space' | 'water' | 'ice' | 'city' | 'magic' | 'fire' | 'cloud';
+}
+
 /** Cada tema abarca cinco niveles consecutivos para guiar contenido y mapa. */
 export const LEVEL_THEMES: readonly LevelTheme[] = [
   { id: 'garden', name: 'Jardín Inicial', startLevel: 1, endLevel: 5, accent: '#66bb6a' },
@@ -32,3 +42,29 @@ export const LEVEL_THEMES: readonly LevelTheme[] = [
 ];
 
 export const themeForLevel = (levelId: number): LevelTheme | undefined => LEVEL_THEMES.find((theme) => levelId >= theme.startLevel && levelId <= theme.endLevel);
+
+/** Palette and decoration family are data, so map and gameplay always agree. */
+export const THEME_VISUALS: Record<string, ThemeVisual> = {
+  garden: { fill: '#dcedc8', wave: '#b9dc8f', detail: '#66a94a', boardBackground: '#dff4cf', kind: 'garden' },
+  trail: { fill: '#f7dfab', wave: '#f3c87b', detail: '#b8834c', boardBackground: '#fff0c9', kind: 'sand' },
+  forest: { fill: '#b9dca7', wave: '#78aa67', detail: '#356b3b', boardBackground: '#d8edc8', kind: 'forest' },
+  space: { fill: '#b7b5e2', wave: '#8582c6', detail: '#4f4a91', boardBackground: '#d9d8fb', kind: 'space' },
+  ocean: { fill: '#9cdae5', wave: '#4baec5', detail: '#147c98', boardBackground: '#d7f4f7', kind: 'water' },
+  desert: { fill: '#f6d28d', wave: '#eab45e', detail: '#b67825', boardBackground: '#fff0c4', kind: 'sand' },
+  dino: { fill: '#b6d58a', wave: '#789c50', detail: '#526c37', boardBackground: '#e4f2cf', kind: 'forest' },
+  castle: { fill: '#e1c7ef', wave: '#bb91d1', detail: '#8050a0', boardBackground: '#f3e6fb', kind: 'magic' },
+  farm: { fill: '#f6dc9e', wave: '#abd174', detail: '#7c9e45', boardBackground: '#fff3d5', kind: 'garden' },
+  jungle: { fill: '#a8d89a', wave: '#589d59', detail: '#276c3b', boardBackground: '#d7f0d0', kind: 'forest' },
+  arctic: { fill: '#d9f3fa', wave: '#a6dce9', detail: '#5babc2', boardBackground: '#eefbff', kind: 'ice' },
+  city: { fill: '#c8d4dc', wave: '#94aebc', detail: '#546e7a', boardBackground: '#e8f0f3', kind: 'city' },
+  music: { fill: '#f6c3dc', wave: '#df79ab', detail: '#b43d79', boardBackground: '#ffe3f0', kind: 'magic' },
+  candy: { fill: '#ffd0df', wave: '#f695bd', detail: '#d95d91', boardBackground: '#fff0f6', kind: 'magic' },
+  robot: { fill: '#cad8df', wave: '#829ba8', detail: '#405d6d', boardBackground: '#e8f1f4', kind: 'city' },
+  cloud: { fill: '#d8eafa', wave: '#a9cff2', detail: '#6399c5', boardBackground: '#eef7ff', kind: 'cloud' },
+  volcano: { fill: '#f7c09e', wave: '#e86e3c', detail: '#a53e23', boardBackground: '#ffe3d1', kind: 'fire' },
+  circus: { fill: '#f6c5be', wave: '#dc7168', detail: '#b63943', boardBackground: '#ffe7df', kind: 'magic' },
+  dream: { fill: '#dbcef3', wave: '#ad94d5', detail: '#7453aa', boardBackground: '#f0eaff', kind: 'cloud' },
+  final: { fill: '#ffeba9', wave: '#f6c948', detail: '#d58c16', boardBackground: '#fff7d6', kind: 'magic' },
+};
+
+export const visualForLevel = (levelId: number): ThemeVisual => THEME_VISUALS[themeForLevel(levelId)?.id ?? 'garden'];

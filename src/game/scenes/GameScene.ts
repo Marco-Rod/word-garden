@@ -11,7 +11,7 @@ import { TouchDebugOverlay } from '../objects/TouchDebugOverlay';
 import { isLayoutDebugEnabled, LayoutDebugOverlay } from '../objects/LayoutDebugOverlay';
 import { createSafeText } from '../objects/SafeText';
 import { WordSelection } from '../objects/WordSelection';
-import { SvgBoardView } from '../ui/SvgBoardView';
+import { getWordListLayout, SvgBoardView } from '../ui/SvgBoardView';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
 import { gameFeedback } from '../feedback/GameFeedback';
@@ -401,18 +401,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private wordListLayout(): { columns: number; columnW: number; gap: number; fontSize: number; areaH: number } {
-    const responsive = getLayoutMetrics(this.scale);
-    const gap = responsive.isCompact ? 10 : 9;
-    const fontSize = responsive.isCompact ? 22 : 21;
-    const availableW = responsive.contentWidth - (responsive.isCompact ? 4 : 8);
-    const longestWord = Math.max(...this.puzzle.words.map((placed) => placed.word.length));
-    const minPillW = Math.ceil(longestWord * fontSize * 0.64 + 28);
-    let columns = Math.min(3, this.puzzle.words.length);
-    while (columns > 1 && (availableW - gap * (columns - 1)) / columns < minPillW) columns--;
-    const columnW = Math.floor((availableW - gap * (columns - 1)) / columns);
-    const rowH = fontSize + (fontSize >= 22 ? 20 : 18);
-    const rows = Math.ceil(this.puzzle.words.length / columns);
-    return { columns, columnW, gap, fontSize, areaH: 58 + rows * rowH + Math.max(0, rows - 1) * gap + 14 };
+    const layout = getWordListLayout(this.scale.width, this.puzzle.words.map((placed) => placed.word));
+    return { columns: layout.columns, columnW: layout.pillW, gap: layout.gap, fontSize: layout.fontSize, areaH: layout.areaH };
   }
 
   private markPillFound(word: string): void {
