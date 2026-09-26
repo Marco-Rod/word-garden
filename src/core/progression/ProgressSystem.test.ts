@@ -33,8 +33,8 @@ describe('ProgressSystem', () => {
   it('does not unlock a level after the final level', () => {
     const system = new ProgressSystem(new LevelSystem(LEVELS), new MemoryRepository());
     for (const level of LEVELS) complete(system, level.id);
-    expect(system.snapshot().highestUnlockedLevel).toBe(10);
-    expect(system.isUnlocked(11)).toBe(false);
+    expect(system.snapshot().highestUnlockedLevel).toBe(100);
+    expect(system.isUnlocked(101)).toBe(false);
   });
 
   it('rejects attempts to start a locked level', () => {
