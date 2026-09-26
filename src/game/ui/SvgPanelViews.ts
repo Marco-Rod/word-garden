@@ -98,7 +98,7 @@ export class SvgTutorialView extends SvgPanel {
 export class SvgResultView extends SvgPanel {
   constructor(private readonly result: GameSessionResult, private readonly totalScore: number, private readonly onNext: () => void, private readonly onMap: () => void) { super(); this.canvas.addEventListener('pointerup', this.onPointerUp); this.refresh(); }
   refresh(): void {
-    const { width, height, compact } = this.dimensions(); this.canvas.replaceChildren(); const final = !levelSystem.next(this.result.levelId); const panelH = Math.min(height - 36, final ? 410 : 510); const { group, cx, top, panelW } = this.panel(width, height, panelH);
+    const { width, height, compact } = this.dimensions(); this.canvas.replaceChildren(); const final = !levelSystem.next(this.result.levelId); const panelH = Math.min(height - 36, final ? 450 : 510); const { group, cx, top, panelW } = this.panel(width, height, panelH);
     text(group, cx, top + 43, final ? '¡INCREÍBLE!' : '¡MUY BIEN!', compact ? 31 : 36, '#1b4f72');
     text(group, cx, top + 78, final ? 'Completaste todos los niveles' : `NIVEL ${this.result.levelId}`, compact ? 21 : 25, '#5d4037');
     text(group, cx, top + (final ? 145 : 128), `${this.result.stars >= 1 ? '★' : '☆'}  ${this.result.stars >= 2 ? '★' : '☆'}  ${this.result.stars >= 3 ? '★' : '☆'}`, compact ? 37 : 42, '#f9a825');

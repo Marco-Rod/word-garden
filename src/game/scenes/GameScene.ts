@@ -14,6 +14,7 @@ import { WordSelection } from '../objects/WordSelection';
 import { SvgBoardView } from '../ui/SvgBoardView';
 import { GameSession } from '../session/GameSession';
 import { runProgress } from '../session/RunProgress';
+import { gameFeedback } from '../feedback/GameFeedback';
 
 interface Pill {
   container: Phaser.GameObjects.Container;
@@ -114,7 +115,7 @@ export class GameScene extends Phaser.Scene {
       start: (row, col) => this.startSvgSelection(row, col),
       move: (row, col) => this.moveSvgSelection(row, col),
       end: (row, col) => this.endSvgSelection(row, col),
-    }, { menu: () => this.openPauseMenu(), pause: (action) => this.handleSvgPause(action) });
+    }, { menu: () => this.openPauseMenu(), sound: () => gameFeedback.toggleMuted(), muted: () => gameFeedback.isMuted(), pause: (action) => this.handleSvgPause(action) });
     this.menuButton?.visual.setVisible(false);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.svgBoard?.destroy());
     // Safari conserva gestos de historial incluso con touch-action en algunos
@@ -507,6 +508,7 @@ export class GameScene extends Phaser.Scene {
 
     this.pointerDown = true;
     this.selection.startAt(tile);
+    gameFeedback.tick();
   }
 
   private startSvgSelection(row: number, col: number): void {
@@ -537,6 +539,7 @@ export class GameScene extends Phaser.Scene {
     if (placed) this.onWordFound(placed);
     else {
       if (this.selection.length > 1) this.session.registerError();
+      if (this.selection.length > 1) gameFeedback.error();
       this.svgBoard?.clearSelection();
     }
     this.selection.clear();
@@ -599,6 +602,7 @@ export class GameScene extends Phaser.Scene {
     this.svgBoard?.setWordFound(placed.word);
     this.svgBoard?.setFound(this.selection.tiles, color.fill, color.stroke);
     this.svgBoard?.showFeedback(`${placed.word} ✓`);
+    gameFeedback.found();
     for (const tile of this.selection.tiles) {
       tile.setFoundColor(color.fill, color.stroke);
       tile.pop();
@@ -618,6 +622,7 @@ export class GameScene extends Phaser.Scene {
     this.isComplete = true;
     this.selection.clear();
     const result = this.session.complete();
+    gameFeedback.complete();
     progressSystem.completeLevel({
       levelId: result.levelId,
       stars: result.stars as 0 | 1 | 2 | 3,
